@@ -17,3 +17,6 @@ To do Theodora:
 
 To do Myrto:
 - [ ]
+
+
+Θα έχουμε ένα γενικό hashtable και δύο subclasses για το lsh και το hypercube 
