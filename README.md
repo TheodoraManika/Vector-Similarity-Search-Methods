@@ -2,7 +2,6 @@
 
 Responsibilities Theodora:
 - [ ] Random Projection
-- [ ] Hash Table
 - [ ] IVFPQ
 - [ ] SIFT
 
