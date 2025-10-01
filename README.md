@@ -15,7 +15,10 @@ To do Theodora:
 - [ ]
 
 To do Myrto:
-- [ ]
+- [ ] LSH.h
+- [ ] LSH.cpp
+- [ ] MNIST.h
+- [ ] MNIST.cpp
 
 
 Θα έχουμε ένα γενικό hashtable και δύο subclasses για το lsh και το hypercube 
