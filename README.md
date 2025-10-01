@@ -12,16 +12,17 @@ Responsibilities Myrto:
 - [ ] MNIST
 
 To do Theodora:
-- [ ]
+- [ ] metrics func
+- [ ] math implementation 
+- [ ] SIFT parse input 
+- [ ] hypercube.h and .cpp
+- [ ] other helpful function
 
 To do Myrto:
 - [ ] LSH.h
 - [ ] LSH.cpp
 - [ ] MNIST.h
 - [ ] MNIST.cpp
-
-
-Θα έχουμε ένα γενικό hashtable και δύο subclasses για το lsh και το hypercube 
 
 
 # Εγκατάσταση (Ubuntu/Debian)
