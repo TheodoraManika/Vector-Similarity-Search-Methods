@@ -31,6 +31,25 @@ namespace Utils {
                 std::filesystem::create_directories(dir);
             }
         }
+        
+        std::string ensureResultsPath(const std::string& filename) {
+            // If filename already starts with "results/", return as is
+            if (filename.find("results/") == 0) {
+                return filename;
+            }
+            
+            // If filename contains path separators, extract just the filename
+            std::filesystem::path path(filename);
+            std::string basename = path.filename().string();
+            
+            // Create the results path
+            std::string results_path = "results/" + basename;
+            
+            // Ensure the results directory exists
+            ensureDirectoryExists(results_path);
+            
+            return results_path;
+        }
     }
     
     // Statistics utilities implementation

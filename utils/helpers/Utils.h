@@ -20,6 +20,7 @@ namespace Utils {
         bool fileExists(const std::string& filename);
         std::string getCurrentTimestamp();
         void ensureDirectoryExists(const std::string& filepath);
+        std::string ensureResultsPath(const std::string& filename);
     }
     
     /**

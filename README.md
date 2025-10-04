@@ -243,11 +243,11 @@ Responsibilities Myrto:
 - [ ] MNIST
 
 To do Theodora:
-- [ ] metrics func
-- [ ] math implementation 
+- [x] metrics func
+- [x] math implementation 
 - [ ] SIFT parse input 
 - [ ] hypercube.h and .cpp
-- [ ] other helpful function
+- [x] other helpful function
 
 To do Myrto:
 - [ ] LSH.h

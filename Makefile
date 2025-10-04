@@ -146,16 +146,16 @@ install: $(TARGET)
 
 # Test targets
 test-lsh: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
+	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
 
 test-hypercube: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o output_hypercube.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 1 -R 2.0
+	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_hypercube.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 1 -R 2.0
 
 test-ivfflat: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o output_ivfflat.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0
+	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_ivfflat.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0
 
 test-ivfpq: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
+	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
 
 # Quick development test with synthetic data
 quick-test: $(QUICK_TEST)

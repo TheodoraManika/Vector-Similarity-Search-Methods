@@ -187,7 +187,9 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     uint64_t m = 4294967291ULL; // 2^32 - 5
     LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), static_cast<uint32_t>(w), dataset);
     
-    std::ofstream output(output_file);
+    // Ensure output file goes to results directory
+    std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
+    std::ofstream output(results_output_file);
     if (!output.is_open()) {
         std::cerr << "Error: Cannot create output file." << std::endl;
         return 1;
@@ -315,7 +317,9 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
         return 1;
     }
     
-    std::ofstream output(output_file);
+    // Ensure output file goes to results directory
+    std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
+    std::ofstream output(results_output_file);
     if (!output.is_open()) {
         std::cerr << "Error: Cannot create output file." << std::endl;
         return 1;
@@ -364,7 +368,9 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
     auto dataset = parseDataset(input_file, type);
     auto queries = parseQueryset(query_file, type);
     
-    std::ofstream output(output_file);
+    // Ensure output file goes to results directory
+    std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
+    std::ofstream output(results_output_file);
     output << "IVFFlat" << std::endl;
     
     // TODO: Implement actual IVFFlat algorithm
@@ -393,7 +399,9 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
     auto dataset = parseDataset(input_file, type);
     auto queries = parseQueryset(query_file, type);
     
-    std::ofstream output(output_file);
+    // Ensure output file goes to results directory
+    std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
+    std::ofstream output(results_output_file);
     output << "IVFPQ" << std::endl;
     
     // TODO: Implement actual IVFPQ algorithm

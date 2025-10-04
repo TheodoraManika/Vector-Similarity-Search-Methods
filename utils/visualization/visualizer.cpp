@@ -1,4 +1,5 @@
 #include "visualizer.h"
+#include "../helpers/Utils.h"
 #include <iomanip>
 #include <sstream>
 #include <filesystem>
@@ -23,7 +24,11 @@ void ResultsVisualizer<T>::write_python_script(const std::string& script_file,
                                               const std::string& xlabel, 
                                               const std::string& ylabel,
                                               const std::vector<std::string>& algorithms) const {
-    std::ofstream script(script_file);
+    // Ensure output files go to results directory
+    std::string results_script_file = Utils::FileUtils::ensureResultsPath(script_file);
+    std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
+    
+    std::ofstream script(results_script_file);
     if (!script.is_open()) {
         std::cerr << "Error: Cannot create Python script file " << script_file << std::endl;
         return;
@@ -87,8 +92,9 @@ void ResultsVisualizer<T>::plot_parameter_impact(const std::string& algorithm_na
         return;
     }
     
-    // Write data file
-    std::ofstream data(data_file);
+    // Write data file to results directory
+    std::string results_data_file = Utils::FileUtils::ensureResultsPath(data_file);
+    std::ofstream data(results_data_file);
     data << "Parameter," << metric_name << "\n";
     
     for (const auto& result : filtered_results) {
@@ -110,15 +116,17 @@ void ResultsVisualizer<T>::plot_parameter_impact(const std::string& algorithm_na
     }
     data.close();
     
-    // Create Python plotting script
-    std::ofstream script(script_file);
+    // Create Python plotting script in results directory
+    std::string results_script_file = Utils::FileUtils::ensureResultsPath(script_file);
+    std::string results_plot_file = Utils::FileUtils::ensureResultsPath(plot_file);
+    std::ofstream script(results_script_file);
     script << "#!/usr/bin/env python3\n";
     script << "import pandas as pd\n";
     script << "import matplotlib.pyplot as plt\n";
     script << "import seaborn as sns\n\n";
     
     script << "# Load data\n";
-    script << "data = pd.read_csv('" << data_file << "')\n";
+    script << "data = pd.read_csv('" << results_data_file << "')\n";
     script << "data = data.sort_values('Parameter')\n\n";
     
     script << "# Create plot\n";
@@ -130,9 +138,9 @@ void ResultsVisualizer<T>::plot_parameter_impact(const std::string& algorithm_na
     script << "plt.title('" << algorithm_name << " - " << metric_name << " vs " << parameter_name << "', fontsize=14, fontweight='bold')\n";
     script << "plt.grid(True, alpha=0.3)\n";
     script << "plt.tight_layout()\n";
-    script << "plt.savefig('" << plot_file << "', dpi=300, bbox_inches='tight')\n";
+    script << "plt.savefig('" << results_plot_file << "', dpi=300, bbox_inches='tight')\n";
     script << "plt.close()\n";
-    script << "print('Parameter impact plot saved to " << plot_file << "')\n";
+    script << "print('Parameter impact plot saved to " << results_plot_file << "')\n";
     
     script.close();
     
@@ -170,8 +178,9 @@ void ResultsVisualizer<T>::plot_algorithm_comparison_bar(const std::string& metr
         algorithm_metrics[result.algorithm_name].push_back(metric_value);
     }
     
-    // Write data file
-    std::ofstream data(data_file);
+    // Write data file to results directory
+    std::string results_data_file = Utils::FileUtils::ensureResultsPath(data_file);
+    std::ofstream data(results_data_file);
     data << "Algorithm," << metric_name << ",StdDev\n";
     
     for (const auto& pair : algorithm_metrics) {
