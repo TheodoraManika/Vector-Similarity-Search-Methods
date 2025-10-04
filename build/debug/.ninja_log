@@ -1,9 +1,0 @@
-# ninja log v5
-3	36	1759317930336186105	utils/interface/CMakeFiles/interface_core.dir/Interface.cpp.o	ea9fd29d1b3c29c6
-3	41	1759317930337746493	utils/visualization/CMakeFiles/visualization_core.dir/visualization.cpp.o	ae2264ca3ff34b90
-6	41	1759317930341301251	algorithms/compare/CMakeFiles/compare_algo.dir/compareAlgo.cpp.o	4447a29f70698e
-8	42	1759317930340110150	test/CMakeFiles/test1.dir/test1.cpp.o	2a22ba4c203269cc
-2	45	1759317930342677100	CMakeFiles/vss_app.dir/src/main.cpp.o	9227e78b66ff878e
-37	67	1759317930365759216	utils/interface/libinterface_core.a	f1467300fb997c3c
-41	68	1759317930368052749	utils/visualization/libvisualization_core.a	648955b29ab65908
-41	69	1759317930369052760	algorithms/compare/libcompare_algo.a	2caa7be0f9e16757

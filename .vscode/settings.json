@@ -46,9 +46,4 @@
         "streambuf": "cpp",
         "typeinfo": "cpp"
     },
-
-    "cmake.useCMakePresets": "always",
-    "cmake.generator": "Ninja",
-    "cmake.buildDirectory": "build/${buildType}",
-    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
 }
