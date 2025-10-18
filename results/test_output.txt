@@ -1,0 +1,21 @@
+Hypercube
+Query: 0
+Nearest neighbor: 131636
+distanceApproximate: 361.584015
+distanceTrue: 232.871216
+R-near neighbors: 0
+Query: 1
+Nearest neighbor: 368
+distanceApproximate: 394.222015
+distanceTrue: 226.245438
+R-near neighbors: 0
+Query: 2
+Nearest neighbor: 85113
+distanceApproximate: 385.372559
+distanceTrue: 175.476501
+R-near neighbors: 0
+Average AF: 1.830441
+Recall@N: 1.830441
+QPS: 3.89
+tApproximateAverage: 0.000035
+tTrueAverage: 0.256828

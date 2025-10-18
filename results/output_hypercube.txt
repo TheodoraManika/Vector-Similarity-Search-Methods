@@ -1,0 +1,9 @@
+Hypercube
+Query: 0
+Nearest neighbor: 21
+distanceApproximate: 0.000000
+distanceTrue: 0.000000
+tAverageApproximate: 0.000035
+tAverageTrue: 0.020063
+MAF: -nan
+QPS: 49.619774
