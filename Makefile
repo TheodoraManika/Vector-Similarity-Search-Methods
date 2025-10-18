@@ -6,6 +6,9 @@ CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -DNDEBUG -march=native
 DEBUG_FLAGS = -std=c++17 -Wall -Wextra -g -DDEBUG
 INCLUDES = -I.
 
+# Dependency generation flags
+DEPFLAGS = -MMD -MP
+
 # Source directories
 SRC_DIR = .
 ALGORITHM_DIR = algorithms
@@ -15,7 +18,7 @@ METRICS_DIR = metrics
 TESTS_DIR = tests
 VIS_DIR = utils/visualization
 
-# Object directory
+# Object directory (created automatically during compilation)
 OBJ_DIR = obj
 
 # Target executables
@@ -23,6 +26,7 @@ TARGET = search
 QUICK_TEST = quick_test
 COMPREHENSIVE_TEST = comprehensive_test
 BENCHMARK_SUITE = benchmark_suite
+COMPREHENSIVE_BENCHMARK = comprehensive_benchmark
 
 # Source files
 MAIN_SRC = src/main.cpp
@@ -48,6 +52,7 @@ VIS_SRC = $(VIS_DIR)/visualizer.cpp
 QUICK_TEST_SRC = $(TESTS_DIR)/quick_test.cpp
 COMPREHENSIVE_TEST_SRC = $(TESTS_DIR)/comprehensive_test.cpp
 BENCHMARK_SUITE_SRC = $(TESTS_DIR)/benchmark_suite.cpp
+COMPREHENSIVE_BENCHMARK_SRC = comprehensive_benchmark.cpp
 
 # Common library sources (excluding main files)
 LIB_SOURCES = $(INTERFACE_SRC) $(UTILS_SRC) $(MATH_SRC) \
@@ -64,24 +69,20 @@ LIB_OBJECTS = $(LIB_SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 QUICK_TEST_OBJECTS = $(QUICK_TEST_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
 COMPREHENSIVE_TEST_OBJECTS = $(COMPREHENSIVE_TEST_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
 BENCHMARK_SUITE_OBJECTS = $(BENCHMARK_SUITE_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
+COMPREHENSIVE_BENCHMARK_OBJECTS = $(COMPREHENSIVE_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
 
-# Create object directory structure
-$(shell mkdir -p $(OBJ_DIR))
-$(shell mkdir -p $(OBJ_DIR)/src)
-$(shell mkdir -p $(OBJ_DIR)/$(UTILS_DIR)/interface)
-$(shell mkdir -p $(OBJ_DIR)/$(UTILS_DIR)/helpers)
-$(shell mkdir -p $(OBJ_DIR)/$(UTILS_DIR)/math)
-$(shell mkdir -p $(OBJ_DIR)/$(DATAPROC_DIR)/SIFT)
-$(shell mkdir -p $(OBJ_DIR)/$(DATAPROC_DIR)/MNIST)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/LSH)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/hypercube)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/Kmeans)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFFlat)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFPQ)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/compare)
-$(shell mkdir -p $(OBJ_DIR)/$(METRICS_DIR))
-$(shell mkdir -p $(OBJ_DIR)/$(VIS_DIR))
-$(shell mkdir -p $(OBJ_DIR)/$(TESTS_DIR))
+# Dependency files
+DEPS = $(MAIN_OBJECTS:.o=.d) $(LIB_OBJECTS:.o=.d) \
+       $(QUICK_TEST_SRC:%.cpp=$(OBJ_DIR)/%.d) \
+       $(COMPREHENSIVE_TEST_SRC:%.cpp=$(OBJ_DIR)/%.d) \
+       $(BENCHMARK_SUITE_SRC:%.cpp=$(OBJ_DIR)/%.d) \
+       $(COMPREHENSIVE_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.d)
+
+# Dependencies (if they exist)
+-include $(DEPS)
+
+# Create object directory structure (done automatically in compilation rule)
+# No manual directory creation needed
 $(shell mkdir -p $(OBJ_DIR)/$(UTILS_DIR)/interface)
 $(shell mkdir -p $(OBJ_DIR)/$(UTILS_DIR)/helpers)
 $(shell mkdir -p $(OBJ_DIR)/$(UTILS_DIR)/math)
@@ -98,7 +99,7 @@ $(shell mkdir -p $(OBJ_DIR)/$(METRICS_DIR))
 all: $(TARGET)
 
 # All targets including tests
-all-tests: $(TARGET) $(QUICK_TEST) $(COMPREHENSIVE_TEST) $(BENCHMARK_SUITE)
+all-tests: $(TARGET) $(QUICK_TEST) $(COMPREHENSIVE_TEST) $(BENCHMARK_SUITE) $(COMPREHENSIVE_BENCHMARK)
 
 # Release build
 $(TARGET): $(MAIN_OBJECTS)
@@ -119,20 +120,28 @@ $(BENCHMARK_SUITE): $(BENCHMARK_SUITE_OBJECTS)
 	@echo "Linking $(BENCHMARK_SUITE)..."
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
 
+$(COMPREHENSIVE_BENCHMARK): $(COMPREHENSIVE_BENCHMARK_OBJECTS)
+	@echo "Linking $(COMPREHENSIVE_BENCHMARK)..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
+
 # Debug build
 debug: CXXFLAGS = $(DEBUG_FLAGS)
 debug: $(TARGET)
 
-# Compile source files to object files
+# Compile source files to object files with dependency generation
 $(OBJ_DIR)/%.o: %.cpp
 	@echo "Compiling $<..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) $(DEPFLAGS) $(INCLUDES) -c $< -o $@
+
+# Include dependency files (if they exist)
+-include $(DEPS)
 
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(OBJ_DIR)
-	rm -f $(TARGET) $(QUICK_TEST) $(COMPREHENSIVE_TEST) $(BENCHMARK_SUITE)
+	rm -f $(TARGET) $(QUICK_TEST) $(COMPREHENSIVE_TEST) $(BENCHMARK_SUITE) $(COMPREHENSIVE_BENCHMARK)
 	rm -rf tests/*.csv
 	rm -rf visualization/*/
 	@echo "Clean completed!"
@@ -146,16 +155,16 @@ install: $(TARGET)
 
 # Test targets
 test-lsh: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
 
 test-hypercube: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_hypercube.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 1 -R 2.0
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 1 -R 2.0
 
 test-ivfflat: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_ivfflat.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0
 
 test-ivfpq: $(TARGET)
-	./$(TARGET) -d dataset/input.dat -q dataset/query.dat -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
 
 # Quick development test with synthetic data
 quick-test: $(QUICK_TEST)
@@ -175,6 +184,13 @@ benchmark: $(BENCHMARK_SUITE)
 	@mkdir -p tests visualization Dataset
 	./$(BENCHMARK_SUITE)
 
+# Comprehensive benchmark with experimental study metrics
+comprehensive-benchmark: $(COMPREHENSIVE_BENCHMARK)
+	@echo "Running comprehensive experimental study as required by PDFs..."
+	@echo "Measuring: Approximation Factor, Recall@N, Queries Per Second"
+	@mkdir -p results tests
+	./$(COMPREHENSIVE_BENCHMARK)
+
 # Generate documentation
 docs:
 	@echo "Generating documentation..."
@@ -183,13 +199,14 @@ docs:
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  all                 - Build main search executable"
+	@echo "  all                 - Build main search executable (incremental)"
 	@echo "  all-tests          - Build all executables including tests"
 	@echo "  debug              - Build with debug flags"
 	@echo "  clean              - Remove build artifacts and results"
-	@echo "  rebuild            - Clean and build"
+	@echo "  rebuild            - Clean and build (forces full recompilation)"
 	@echo "  quick-test         - Run quick test with synthetic data"
 	@echo "  comprehensive-test - Run full algorithm comparison"
+	@echo "  comprehensive-benchmark - Run PDF-required experimental study (AF, Recall@N, QPS)"
 	@echo "  benchmark          - Run complete benchmark suite"
 	@echo "  test-lsh           - Test LSH algorithm"
 	@echo "  test-hypercube     - Test Hypercube algorithm"
@@ -197,9 +214,15 @@ help:
 	@echo "  test-ivfpq         - Test IVFPQ algorithm"
 	@echo "  docs               - Generate documentation"
 	@echo "  install            - Install to /usr/local/bin"
+	@echo ""
+	@echo "Note: Makefile uses incremental compilation - only changed files are recompiled"
+	@echo "Use 'rebuild' to force full recompilation if needed"
 # Phony targets
-.PHONY: all all-tests debug clean rebuild install quick-test comprehensive-test benchmark docs help
+.PHONY: all all-tests debug clean rebuild install quick-test comprehensive-test benchmark comprehensive-benchmark docs help
 .PHONY: test-lsh test-hypercube test-ivfflat test-ivfpq
+
+# Note: This Makefile uses automatic dependency generation for incremental compilation
+# Only changed source files and their dependencies will be recompiled
 
 # Dependencies (basic)
 $(OBJ_DIR)/main.o: main.cpp $(UTILS_DIR)/interface/Interface.h

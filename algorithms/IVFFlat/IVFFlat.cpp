@@ -274,7 +274,6 @@ std::list<std::pair<int, T>> IVFFlat<T>::search_k_nearest(const std::vector<T>& 
     
     // Convert priority queue to sorted list (ascending order by distance)
     std::list<std::pair<int, T>> result;
-    result.reserve(pq.size());
     
     while (!pq.empty()) {
         auto& top = pq.top();
@@ -307,9 +306,6 @@ std::list<std::pair<int, T>> IVFFlat<T>::range_search(const std::vector<T>& quer
     // For simplicity, we probe more clusters for range search
     uint32_t clusters_to_probe = std::min(n_probe * 2, n_clusters);
     std::vector<int> clusters = find_nearest_clusters(query, clusters_to_probe);
-    
-    // Reserve approximate space
-    result.reserve(100);  // Heuristic initial size
     
     // Search in selected clusters
     for (int cluster_id : clusters) {

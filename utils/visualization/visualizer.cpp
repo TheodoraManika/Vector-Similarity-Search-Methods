@@ -4,6 +4,7 @@
 #include <sstream>
 #include <filesystem>
 #include <cstdlib>
+#include <numeric>
 
 template <typename T>
 std::vector<std::string> ResultsVisualizer<T>::get_unique_algorithms() const {
@@ -23,7 +24,7 @@ void ResultsVisualizer<T>::write_python_script(const std::string& script_file,
                                               const std::string& title,
                                               const std::string& xlabel, 
                                               const std::string& ylabel,
-                                              const std::vector<std::string>& algorithms) const {
+                                              [[maybe_unused]] const std::vector<std::string>& algorithms) const {
     // Ensure output files go to results directory
     std::string results_script_file = Utils::FileUtils::ensureResultsPath(script_file);
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
@@ -103,13 +104,13 @@ void ResultsVisualizer<T>::plot_parameter_impact(const std::string& algorithm_na
             data << param_it->second << ",";
             
             if (metric_name == "AF") {
-                data << result.average_approximation_factor;
+                data << result.mean_approximation_factor;
             } else if (metric_name == "Recall") {
                 data << result.recall_at_n;
             } else if (metric_name == "QPS") {
                 data << result.queries_per_second;
             } else if (metric_name == "Time") {
-                data << result.average_approximate_time_ms;
+                data << result.mean_query_time;
             }
             data << "\n";
         }
@@ -166,13 +167,13 @@ void ResultsVisualizer<T>::plot_algorithm_comparison_bar(const std::string& metr
     for (const auto& result : results) {
         T metric_value = 0;
         if (metric_name == "AF") {
-            metric_value = result.average_approximation_factor;
+            metric_value = result.mean_approximation_factor;
         } else if (metric_name == "Recall") {
             metric_value = result.recall_at_n;
         } else if (metric_name == "QPS") {
             metric_value = result.queries_per_second;
         } else if (metric_name == "Time") {
-            metric_value = result.average_approximate_time_ms;
+            metric_value = result.mean_query_time;
         }
         
         algorithm_metrics[result.algorithm_name].push_back(metric_value);
@@ -246,7 +247,7 @@ void ResultsVisualizer<T>::plot_recall_vs_approximation_factor() const {
     for (const auto& result : results) {
         data << result.algorithm_name << "," 
              << result.recall_at_n << "," 
-             << result.average_approximation_factor << "\n";
+             << result.mean_approximation_factor << "\n";
     }
     data.close();
     
@@ -403,11 +404,11 @@ void ResultsVisualizer<T>::create_html_report(const std::string& filename) const
     for (const auto& result : results) {
         html << "<tr>\n";
         html << "<td>" << result.algorithm_name << "</td>\n";
-        html << "<td>" << std::fixed << std::setprecision(3) << result.average_approximation_factor << "</td>\n";
+        html << "<td>" << std::fixed << std::setprecision(3) << result.mean_approximation_factor << "</td>\n";
         html << "<td>" << std::fixed << std::setprecision(3) << result.recall_at_n << "</td>\n";
         html << "<td>" << std::fixed << std::setprecision(1) << result.queries_per_second << "</td>\n";
-        html << "<td>" << std::fixed << std::setprecision(2) << result.average_approximate_time_ms << "</td>\n";
-        html << "<td>" << std::fixed << std::setprecision(1) << (result.memory_usage_bytes / (1024.0 * 1024.0)) << "</td>\n";
+        html << "<td>" << std::fixed << std::setprecision(2) << result.mean_query_time << "</td>\n";
+        html << "<td>" << result.dataset_size << "</td>\n";
         html << "</tr>\n";
     }
     
