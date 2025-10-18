@@ -215,7 +215,7 @@ QPS: <queries_per_second>
 - [Όνομα Φοιτητή 1] - [ΑΜ] - [email]
 - [Όνομα Φοιτητή 2] - [ΑΜ] - [email]
 
-**Ακαδημαϊκό Έτος:** 2024-2025
+**Ακαδημαϊκό Έτος:** 2025-2026
 
 **Μάθημα:** Ανάπτυξη Λογισμικού για Αλγοριθμικά Προβλήματα
 
@@ -224,54 +224,6 @@ QPS: <queries_per_second>
 ## Άδεια Χρήσης
 
 Αυτό το έργο αναπτύχθηκε για εκπαιδευτικούς σκοπούς ως μέρος πανεπιστημιακής εργασίας.
-
-## Αναφορές
-
-1. A. Andoni and P. Indyk. Near-optimal hashing algorithms for approximate nearest neighbor in high dimensions. Communications of the ACM, 2008.
-2. H. Jégou, M. Douze, and C. Schmid. Product quantization for nearest neighbor search. IEEE TPAMI, 2011.
-3. J. Wang, T. Zhang, N. Sebe, H. T. Shen, et al. A survey on learning to hash. IEEE TPAMI, 2018.
-
-Responsibilities Theodora:
-- [ ] Random Projection
-- [ ] IVFPQ
-- [ ] SIFT
-
-Responsibilities Myrto:
-- [ ] LSH
-- [ ] kmeans
-- [ ] IVFFlat
-- [ ] MNIST
-
-To do Theodora:
-- [x] metrics func
-- [x] math implementation 
-- [ ] SIFT parse input 
-- [ ] hypercube.h and .cpp
-- [x] other helpful function
-
-To do Myrto:
-- [✓] διαβάζεις διαφάνειες και βλέπεις αν πρέπει να γίνει κάποια αλλαγή στους κώδικες πχ κάποια πράξη δεν έγινε για lsh
-- [✓] τα βάζεις όλα στο chat να σου πεί τη γνώμη του για lsh
-- [✓] βλέπεις αν υπάρει κάτι που λείπει από την εκφώνηση για lsh
-- [✓] διάβασε τις διαφάνειες για kmeans
-- [✓] δες αν είναι σωστά υλοποιημένες και οι 3 φάσεις φιατί ζητάει κάτι διαφορετικό από το συνηθισμένο 
-- [✓] όταν βρείς τις διαφορές ζητησε από το chat να στο υλοποιήσει χειροκίνητα χωρίς να του δώσεις όλο το αρχείο απλά περιγράφοντας του τι λείπει
-- [✓] την ίδια διαδικασία ακολούθησε για ivfflat 
-- [✓] είπε στις διαφάνειες ότι θα χρησιμοποιήσουμε αυτό που υλοποιήσαμε στο lsh όποτε δες αν το χρησιμοποιούμε και για τα δύο όντως
-
-
-# Εγκατάσταση (Ubuntu/Debian)
-sudo apt update
-sudo apt install -y build-essential
-
-# Από τον ριζικό φάκελο του project σου:
-make
-
-# Τρέξε το εκτελέσιμο
-./bin/main
-
-# Tests
-ctest --preset test-debug
 
 
 https://github.com/nikosgalanis/Vectors-Similarity-Search-and-Clustering/blob/main/results/cluster_lloyds_1000_queries

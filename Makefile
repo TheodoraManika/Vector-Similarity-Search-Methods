@@ -15,7 +15,6 @@ ALGORITHM_DIR = algorithms
 DATAPROC_DIR = dataprocessing
 UTILS_DIR = utils
 METRICS_DIR = metrics
-TESTS_DIR = tests
 VIS_DIR = utils/visualization
 
 # Object directory (created automatically during compilation)
@@ -23,10 +22,8 @@ OBJ_DIR = obj
 
 # Target executables
 TARGET = search
-QUICK_TEST = quick_test
-COMPREHENSIVE_TEST = comprehensive_test
-BENCHMARK_SUITE = benchmark_suite
 COMPREHENSIVE_BENCHMARK = comprehensive_benchmark
+VISUAL_BENCHMARK = visual_benchmark
 
 # Source files
 MAIN_SRC = src/main.cpp
@@ -49,10 +46,8 @@ METRICS_SRC = $(METRICS_DIR)/metrics.cpp
 VIS_SRC = $(VIS_DIR)/visualizer.cpp
 
 # Test sources
-QUICK_TEST_SRC = $(TESTS_DIR)/quick_test.cpp
-COMPREHENSIVE_TEST_SRC = $(TESTS_DIR)/comprehensive_test.cpp
-BENCHMARK_SUITE_SRC = $(TESTS_DIR)/benchmark_suite.cpp
-COMPREHENSIVE_BENCHMARK_SRC = comprehensive_benchmark.cpp
+COMPREHENSIVE_BENCHMARK_SRC = src/comprehensive_benchmark.cpp
+VISUAL_BENCHMARK_SRC = src/visual_benchmark.cpp
 
 # Common library sources (excluding main files)
 LIB_SOURCES = $(INTERFACE_SRC) $(UTILS_SRC) $(MATH_SRC) \
@@ -66,17 +61,13 @@ MAIN_SOURCES = $(MAIN_SRC) $(LIB_SOURCES)
 # Object files
 MAIN_OBJECTS = $(MAIN_SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 LIB_OBJECTS = $(LIB_SOURCES:%.cpp=$(OBJ_DIR)/%.o)
-QUICK_TEST_OBJECTS = $(QUICK_TEST_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
-COMPREHENSIVE_TEST_OBJECTS = $(COMPREHENSIVE_TEST_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
-BENCHMARK_SUITE_OBJECTS = $(BENCHMARK_SUITE_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
 COMPREHENSIVE_BENCHMARK_OBJECTS = $(COMPREHENSIVE_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
+VISUAL_BENCHMARK_OBJECTS = $(VISUAL_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
 
 # Dependency files
 DEPS = $(MAIN_OBJECTS:.o=.d) $(LIB_OBJECTS:.o=.d) \
-       $(QUICK_TEST_SRC:%.cpp=$(OBJ_DIR)/%.d) \
-       $(COMPREHENSIVE_TEST_SRC:%.cpp=$(OBJ_DIR)/%.d) \
-       $(BENCHMARK_SUITE_SRC:%.cpp=$(OBJ_DIR)/%.d) \
-       $(COMPREHENSIVE_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.d)
+       $(COMPREHENSIVE_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.d) \
+       $(VISUAL_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.d)
 
 # Dependencies (if they exist)
 -include $(DEPS)
@@ -93,13 +84,16 @@ $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/hypercube)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/Kmeans)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFFlat)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFPQ)
+$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/compare)
 $(shell mkdir -p $(OBJ_DIR)/$(METRICS_DIR))
+$(shell mkdir -p $(OBJ_DIR)/$(VIS_DIR))
+$(shell mkdir -p $(OBJ_DIR)/src)
 
 # Default target
 all: $(TARGET)
 
 # All targets including tests
-all-tests: $(TARGET) $(QUICK_TEST) $(COMPREHENSIVE_TEST) $(BENCHMARK_SUITE) $(COMPREHENSIVE_BENCHMARK)
+all-tests: $(TARGET) $(COMPREHENSIVE_BENCHMARK) $(VISUAL_BENCHMARK)
 
 # Release build
 $(TARGET): $(MAIN_OBJECTS)
@@ -108,20 +102,12 @@ $(TARGET): $(MAIN_OBJECTS)
 	@echo "Build completed successfully!"
 
 # Test executables
-$(QUICK_TEST): $(QUICK_TEST_OBJECTS)
-	@echo "Linking $(QUICK_TEST)..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
-
-$(COMPREHENSIVE_TEST): $(COMPREHENSIVE_TEST_OBJECTS)
-	@echo "Linking $(COMPREHENSIVE_TEST)..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
-
-$(BENCHMARK_SUITE): $(BENCHMARK_SUITE_OBJECTS)
-	@echo "Linking $(BENCHMARK_SUITE)..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
-
 $(COMPREHENSIVE_BENCHMARK): $(COMPREHENSIVE_BENCHMARK_OBJECTS)
 	@echo "Linking $(COMPREHENSIVE_BENCHMARK)..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
+
+$(VISUAL_BENCHMARK): $(VISUAL_BENCHMARK_OBJECTS)
+	@echo "Linking $(VISUAL_BENCHMARK)..."
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
 
 # Debug build
@@ -141,9 +127,9 @@ $(OBJ_DIR)/%.o: %.cpp
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(OBJ_DIR)
-	rm -f $(TARGET) $(QUICK_TEST) $(COMPREHENSIVE_TEST) $(BENCHMARK_SUITE) $(COMPREHENSIVE_BENCHMARK)
+	rm -f $(TARGET) $(COMPREHENSIVE_BENCHMARK) $(VISUAL_BENCHMARK)
 	rm -rf tests/*.csv
-	rm -rf visualization/*/
+	rm -rf results/visualization/
 	@echo "Clean completed!"
 
 # Clean and rebuild
@@ -166,23 +152,6 @@ test-ivfflat: $(TARGET)
 test-ivfpq: $(TARGET)
 	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
 
-# Quick development test with synthetic data
-quick-test: $(QUICK_TEST)
-	@echo "Running quick algorithm comparison test..."
-	@mkdir -p tests visualization
-	./$(QUICK_TEST)
-
-# Comprehensive test suite
-comprehensive-test: $(COMPREHENSIVE_TEST)
-	@echo "Running comprehensive algorithm tests..."
-	@mkdir -p tests visualization
-	./$(COMPREHENSIVE_TEST)
-
-# Full benchmark suite
-benchmark: $(BENCHMARK_SUITE)
-	@echo "Running full benchmark suite..."
-	@mkdir -p tests visualization Dataset
-	./$(BENCHMARK_SUITE)
 
 # Comprehensive benchmark with experimental study metrics
 comprehensive-benchmark: $(COMPREHENSIVE_BENCHMARK)
@@ -190,6 +159,13 @@ comprehensive-benchmark: $(COMPREHENSIVE_BENCHMARK)
 	@echo "Measuring: Approximation Factor, Recall@N, Queries Per Second"
 	@mkdir -p results tests
 	./$(COMPREHENSIVE_BENCHMARK)
+
+# Visual benchmark with parameter sweeps and comprehensive visualization
+visual-benchmark: $(VISUAL_BENCHMARK)
+	@echo "Running comprehensive visual benchmark with parameter analysis..."
+	@echo "Generating plots, parameter impact analysis, and HTML reports"
+	@mkdir -p results/visualization
+	./$(VISUAL_BENCHMARK)
 
 # Generate documentation
 docs:
@@ -204,10 +180,8 @@ help:
 	@echo "  debug              - Build with debug flags"
 	@echo "  clean              - Remove build artifacts and results"
 	@echo "  rebuild            - Clean and build (forces full recompilation)"
-	@echo "  quick-test         - Run quick test with synthetic data"
-	@echo "  comprehensive-test - Run full algorithm comparison"
 	@echo "  comprehensive-benchmark - Run PDF-required experimental study (AF, Recall@N, QPS)"
-	@echo "  benchmark          - Run complete benchmark suite"
+	@echo "  visual-benchmark   - Run comprehensive visual analysis with parameter sweeps"
 	@echo "  test-lsh           - Test LSH algorithm"
 	@echo "  test-hypercube     - Test Hypercube algorithm"
 	@echo "  test-ivfflat       - Test IVFFlat algorithm"
@@ -215,10 +189,17 @@ help:
 	@echo "  docs               - Generate documentation"
 	@echo "  install            - Install to /usr/local/bin"
 	@echo ""
+	@echo "NEW: visual-benchmark provides comprehensive analysis with:"
+	@echo "  - Parameter sweep testing for all algorithms"
+	@echo "  - Automatic plot generation (bar charts, trade-off analysis)"
+	@echo "  - Parameter impact analysis"
+	@echo "  - Interactive HTML report with embedded visualizations"
+	@echo "  - Results saved to results/visualization/ directory"
+	@echo ""
 	@echo "Note: Makefile uses incremental compilation - only changed files are recompiled"
 	@echo "Use 'rebuild' to force full recompilation if needed"
 # Phony targets
-.PHONY: all all-tests debug clean rebuild install quick-test comprehensive-test benchmark comprehensive-benchmark docs help
+.PHONY: all all-tests debug clean rebuild install comprehensive-benchmark visual-benchmark docs help
 .PHONY: test-lsh test-hypercube test-ivfflat test-ivfpq
 
 # Note: This Makefile uses automatic dependency generation for incremental compilation
