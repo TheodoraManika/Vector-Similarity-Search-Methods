@@ -10,12 +10,13 @@ Responsibilities Myrto:
 - [ ] MNIST
 
 To do Theodora:
-- [ ] metrics func
-- [ ] math implementation 
-- [ ] SIFT parse input 
-- [ ] hypercube.h and .cpp
-- [ ] other helpful function
-
+- [x] metrics func
+- [x] math implementation 
+- [x] SIFT parse input 
+- [x] hypercube.h and .cpp
+- [x] other helpful function
+- [ ] checking hypercube implementation until correct
+ 
 To do Myrto:
 - [✓] διαβάζεις διαφάνειες και βλέπεις αν πρέπει να γίνει κάποια αλλαγή στους κώδικες πχ κάποια πράξη δεν έγινε για lsh
 - [✓] τα βάζεις όλα στο chat να σου πεί τη γνώμη του για lsh
