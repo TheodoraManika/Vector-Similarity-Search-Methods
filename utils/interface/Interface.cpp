@@ -36,11 +36,12 @@ int Interface::runSearch(int argc, char* argv[]) {
                        k, L, kproj, kclusters, nprobe, M, probes, nbits, N, seed, w, R, range);
         
         // Set default R values based on dataset type
+        // Default: R = 2000 for MNIST, R = 2 for SIFT (as per specification)
         if (R == 10000.0) { // If R wasn't explicitly set
             if (type == "mnist") {
-                R = 2.0;
-            } else if (type == "sift") {
                 R = 2000.0;
+            } else if (type == "sift") {
+                R = 2.0;
             }
         }
         
@@ -176,7 +177,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     
     std::cout << "Executing LSH algorithm..." << std::endl;
     std::cout << "Parameters: k=" << k << ", L=" << L << ", w=" << w 
-              << ", N=" << N << ", R=" << R << std::endl;
+              << ", N=" << N << ", R=" << R << ", seed=1 (default)" << std::endl;
     
     // Parse datasets
     auto dataset = parseDataset(input_file, type);
@@ -191,10 +192,11 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
               << dataset[0].size() << " dimensions" << std::endl;
     std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
     
-    // Initialize LSH
+    // Initialize LSH with default seed = 1
     uint32_t M = 1000007; // Large prime for hash table size
     uint64_t m = 4294967291ULL; // 2^32 - 5
-    LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), static_cast<uint32_t>(w), dataset);
+    int seed = 1; // Default seed as per specification
+    LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), static_cast<uint32_t>(w), dataset, seed);
     
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
@@ -210,6 +212,9 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     auto start_time = std::chrono::high_resolution_clock::now();
     auto total_approx_time = std::chrono::duration<double>::zero();
     auto total_true_time = std::chrono::duration<double>::zero();
+    double total_af = 0.0;
+    double total_recall = 0.0;
+    int valid_queries = 0;
     
     for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
         const auto& query = queries[query_idx];
@@ -252,6 +257,36 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         auto true_end = std::chrono::high_resolution_clock::now();
         total_true_time += true_end - true_start;
         
+        // Calculate AF (Approximation Factor) for this query
+        // AF = distanceApproximate / distanceTrue for the first neighbor
+        double query_af = 0.0;
+        if (!neighbors.empty() && !true_neighbors.empty()) {
+            float approx_dist = neighbors.front().second;
+            float true_dist = true_neighbors.front().second;
+            if (true_dist > 0) {
+                query_af = approx_dist / true_dist;
+            }
+        }
+        
+        // Calculate Recall@N for this query
+        // Recall@N = (number of true neighbors found in approximate results) / N
+        std::unordered_set<int> approx_ids;
+        for (const auto& neighbor : neighbors) {
+            approx_ids.insert(neighbor.first);
+        }
+        
+        int matches = 0;
+        for (const auto& true_neighbor : true_neighbors) {
+            if (approx_ids.count(true_neighbor.first)) {
+                matches++;
+            }
+        }
+        double query_recall = static_cast<double>(matches) / N;
+        
+        total_af += query_af;
+        total_recall += query_recall;
+        valid_queries++;
+        
         // Output neighbors
         auto neighbor_it = neighbors.begin();
         auto true_it = true_neighbors.begin();
@@ -291,27 +326,19 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     auto end_time = std::chrono::high_resolution_clock::now();
     auto total_time = end_time - start_time;
     
-    // Calculate required metrics according to PDF specification
-    double total_af = 0.0;
-    double total_recall = 0.0;
-    int valid_queries = 0;
-    
-    // Calculate approximation factor and recall (simplified for now)
-    // In a full implementation, this would be calculated during the query loop
-    for (size_t i = 0; i < std::min(queries.size(), static_cast<size_t>(100)); ++i) {
-        total_af += 1.05; // Placeholder - should be actual AF calculation
-        total_recall += 0.85; // Placeholder - should be actual recall calculation
-        valid_queries++;
-    }
-    
+    // Calculate average metrics
     double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
     double recall_at_n = valid_queries > 0 ? total_recall / valid_queries : 0.0;
     double avg_approx_time = total_approx_time.count() / queries.size();
     double avg_true_time = total_true_time.count() / queries.size();
     double qps = queries.size() / total_time.count();
     
-    // Output final statistics according to PDF specification
-    printFinalStatistics(output, avg_af, recall_at_n, qps, avg_approx_time, avg_true_time);
+    // Output final statistics according to specification
+    output << "Average AF: " << std::fixed << std::setprecision(6) << avg_af << std::endl;
+    output << "Recall@" << N << ": " << std::fixed << std::setprecision(6) << recall_at_n << std::endl;
+    output << "QPS: " << std::fixed << std::setprecision(2) << qps << std::endl;
+    output << "tApproximateAverage: " << std::fixed << std::setprecision(6) << avg_approx_time << std::endl;
+    output << "tTrueAverage: " << std::fixed << std::setprecision(6) << avg_true_time << std::endl;
     
     output.close();
     std::cout << "LSH search completed successfully" << std::endl;

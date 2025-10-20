@@ -137,11 +137,12 @@ public:
         std::cout << "Testing LSH with parameters: k=" << k << " L=" << L << " w=" << w 
                   << " N=" << N << " R=" << R << std::endl;
         
-        // Initialize LSH
+        // Initialize LSH with default seed = 1
         uint32_t M = 1000;  // Hash table size
         uint64_t m = 4294967291ULL;  // 2^32 - 5
+        int seed = 1; // Default seed as per specification
         LSH<T> lsh(L, m, M, dataset.size(), k, dataset[0].size(), w, 
-                   const_cast<std::vector<std::vector<T>>&>(dataset));
+                   const_cast<std::vector<std::vector<T>>&>(dataset), seed);
         
         // Performance metrics
         double total_af = 0.0;

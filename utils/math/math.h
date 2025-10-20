@@ -52,29 +52,55 @@ namespace our_math {
     // generate random float in range [min, max]
     inline float random_float(float min, float max);
     
-    // generate random gaussian distributed value
+    // generate random gaussian (normal) distributed value
+    // Standard normal: N(μ=0, σ=1) with mean=0, variance σ²=1, standard deviation σ=1
     inline double random_gaussian(double mean = 0.0, double stddev = 1.0);
     
-    // LSH hash function structures
+    // find next prime number >= n (for hash table sizing)
+    inline uint32_t next_prime(uint32_t n);
+    
+    // LSH hash function structures for Euclidean space
+    // Basic hash: h(p) = floor((p·v + t) / w) where:
+    //   - v ~ N(0,1)^d (d-vector with i.i.d. standard normal coordinates)
+    //     Each coordinate vi ~ N(μ=0, σ²=1) for i=1,2,...,d
+    //     Standard normal: mean μ=0, variance σ²=1, standard deviation σ=1
+    //   - t ∈ [0, w) uniformly at random
+    //   - w is the "window" parameter (typically w ∈ [2, 6])
+    //
+    // Amplified hash (classic with double modulo):
+    //   g(p) = [(r1*h1(p) + r2*h2(p) + ... + rk*hk(p)) mod M] mod TableSize
+    //   - M = 2^32 - 5 = 4294967291 (prime for good hashing)
+    //   - ri ∈ Z are random int coefficients
+    //   - TableSize = n/4, n/8, or n/16 (heuristic to minimize empty buckets)
+    //   - Uses modular arithmetic: (a□b) mod m = ((a mod m)□(b mod m)) mod m
     namespace lsh {
         struct HashFunction {
-            std::vector<double> a;  // Random coefficients
-            double t;               // Random shift
+            std::vector<double> a;  // Random vector v ~ N(0,1)^d, each vi ~ N(μ=0, σ²=1)
+            double t;               // Random shift t ∈ [0, w)
         };
         
         struct BasicHashFunction {
-            std::vector<double> a;  // Random coefficients  
-            double t;               // Random shift
+            std::vector<double> a;  // Random vector v ~ N(0,1)^d for hi, each vi ~ N(μ=0, σ²=1)
+            double t;               // Random shift t ∈ [0, w) for hi
+            uint32_t r;             // Random coefficient ri for linear combination
         };
         
         struct AmplifiedHashFunction {
             std::vector<BasicHashFunction> hash_functions;  // k basic hash functions
+            // Implements classic double modulo:
+            // g(p) = [(r1*h1(p) + ... + rk*hk(p)) mod M] mod TableSize
+            // where M = 2^32 - 5 (prime)
         };
     }
     
     // LSH hash computation functions
     template <typename T>
     int computeBasicHash(const std::vector<T>& vector, const lsh::HashFunction& hash_fn, uint32_t w);
+    
+    // Compute ID(p) = (r1*h1(p) + r2*h2(p) + ... + rk*hk(p)) mod M
+    // ID is locality-sensitive and used for efficient filtering
+    template <typename T>
+    uint64_t computeID(const std::vector<T>& vector, const lsh::AmplifiedHashFunction& amp_hash_fn, uint32_t w);
     
     template <typename T>
     uint32_t computeAmplifiedHash(const std::vector<T>& vector, const lsh::AmplifiedHashFunction& amp_hash_fn, 

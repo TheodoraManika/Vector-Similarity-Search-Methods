@@ -10,7 +10,8 @@
 #include <sstream>
 #include <set>
 #include <numeric>
-#include <filesystem>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 // Include algorithm headers
 #include "algorithms/LSH/LSH.h"
@@ -93,8 +94,8 @@ private:
 public:
     VisualBenchmark() : visualizer("results/visualization") {
         // Create results and visualization directories
-        std::filesystem::create_directories("results");
-        std::filesystem::create_directories("results/visualization");
+        mkdir("results", 0755);
+        mkdir("results/visualization", 0755);
     }
     
     // Test LSH algorithm with comprehensive parameter analysis
@@ -119,11 +120,12 @@ public:
                   << " N=" << N << " R=" << R << " on " << dataset_name << std::endl;
         
         try {
-            // Initialize LSH
+            // Initialize LSH with default seed = 1
             uint32_t M = 1000;  // Hash table size
             uint64_t m = 4294967291ULL;  // 2^32 - 5
+            int seed = 1; // Default seed as per specification
             LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), w, 
-                          const_cast<std::vector<std::vector<float>>&>(dataset));
+                          const_cast<std::vector<std::vector<float>>&>(dataset), seed);
             
             // Performance metrics
             double total_af = 0.0;
