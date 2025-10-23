@@ -57,7 +57,7 @@ namespace our_math {
     inline double random_gaussian(double mean = 0.0, double stddev = 1.0);
     
     // find next prime number >= n (for hash table sizing)
-    inline uint32_t next_prime(uint32_t n);
+    uint32_t next_prime(uint32_t n);
     
     // LSH hash function structures for Euclidean space
     // Basic hash: h(p) = floor((p·v + t) / w) where:

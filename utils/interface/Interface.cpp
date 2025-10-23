@@ -288,27 +288,31 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         valid_queries++;
         
         // Output neighbors
-        auto neighbor_it = neighbors.begin();
+        auto approx_it = neighbors.begin();
         auto true_it = true_neighbors.begin();
         
         for (int i = 1; i <= N; ++i) {
-            output << "Nearest neighbor-" << i << ": ";
-            
-            if (neighbor_it != neighbors.end()) {
-                output << neighbor_it->first << std::endl;
+            if (approx_it != neighbors.end() && true_it != true_neighbors.end()) {
+                int approx_neighbor_id = approx_it->first;
+                float approx_distance = approx_it->second;
+                float true_distance = true_it->second;
+                
+                // Output the APPROXIMATE neighbor ID (what LSH found)
+                output << "Nearest neighbor-" << i << ": " << approx_neighbor_id << std::endl;
+                
+                // distanceApproximate: distance from query to the approximate neighbor
                 output << "distanceApproximate: " << std::fixed << std::setprecision(6) 
-                       << neighbor_it->second << std::endl;
-                ++neighbor_it;
-            } else {
-                output << "NONE" << std::endl;
-                output << "distanceApproximate: " << std::numeric_limits<float>::max() << std::endl;
-            }
-            
-            if (true_it != true_neighbors.end()) {
+                       << approx_distance << std::endl;
+                
+                // distanceTrue: distance from query to the TRUE nearest neighbor
                 output << "distanceTrue: " << std::fixed << std::setprecision(6) 
-                       << true_it->second << std::endl;
+                       << true_distance << std::endl;
+                
+                ++approx_it;
                 ++true_it;
             } else {
+                output << "Nearest neighbor-" << i << ": NONE" << std::endl;
+                output << "distanceApproximate: " << std::numeric_limits<float>::max() << std::endl;
                 output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
             }
         }
@@ -325,13 +329,14 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     
     auto end_time = std::chrono::high_resolution_clock::now();
     auto total_time = end_time - start_time;
+    double total_time_seconds = std::chrono::duration<double>(total_time).count();
     
     // Calculate average metrics
     double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
     double recall_at_n = valid_queries > 0 ? total_recall / valid_queries : 0.0;
     double avg_approx_time = total_approx_time.count() / queries.size();
     double avg_true_time = total_true_time.count() / queries.size();
-    double qps = queries.size() / total_time.count();
+    double qps = total_time_seconds > 0 ? queries.size() / total_time_seconds : 0.0;
     
     // Output final statistics according to specification
     output << "Average AF: " << std::fixed << std::setprecision(6) << avg_af << std::endl;

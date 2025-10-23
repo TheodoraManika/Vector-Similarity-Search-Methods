@@ -140,8 +140,14 @@ install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
 # Test targets
-test-lsh: $(TARGET)
+test-lsh-sift: $(TARGET)
 	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
+
+test-lsh-mnist: $(TARGET)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_lsh_mnist.txt -type mnist -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2000.0
+
+# Alias for backward compatibility
+test-lsh: test-lsh-sift
 
 test-hypercube: $(TARGET)
 	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 1 -R 2.0
@@ -182,7 +188,9 @@ help:
 	@echo "  rebuild            - Clean and build (forces full recompilation)"
 	@echo "  comprehensive-benchmark - Run PDF-required experimental study (AF, Recall@N, QPS)"
 	@echo "  visual-benchmark   - Run comprehensive visual analysis with parameter sweeps"
-	@echo "  test-lsh           - Test LSH algorithm"
+	@echo "  test-lsh-sift      - Test LSH algorithm with SIFT dataset"
+	@echo "  test-lsh-mnist     - Test LSH algorithm with MNIST dataset"
+	@echo "  test-lsh           - Test LSH algorithm with SIFT (alias for test-lsh-sift)"
 	@echo "  test-hypercube     - Test Hypercube algorithm"
 	@echo "  test-ivfflat       - Test IVFFlat algorithm"
 	@echo "  test-ivfpq         - Test IVFPQ algorithm"
@@ -200,7 +208,7 @@ help:
 	@echo "Use 'rebuild' to force full recompilation if needed"
 # Phony targets
 .PHONY: all all-tests debug clean rebuild install comprehensive-benchmark visual-benchmark docs help
-.PHONY: test-lsh test-hypercube test-ivfflat test-ivfpq
+.PHONY: test-lsh test-lsh-sift test-lsh-mnist test-hypercube test-ivfflat test-ivfpq
 
 # Note: This Makefile uses automatic dependency generation for incremental compilation
 # Only changed source files and their dependencies will be recompiled

@@ -54,8 +54,8 @@ namespace our_math {
         int sample_size = std::min(1000, n_images * n_images / 4); // Sample up to 1000 pairs
         
         for (int i = 0; i < sample_size; ++i) {
-            int idx1 = dis(gen);
-            int idx2 = dis(gen);
+            size_t idx1 = static_cast<size_t>(dis(gen));
+            size_t idx2 = static_cast<size_t>(dis(gen));
             
             if (idx1 != idx2 && idx1 < feature_vectors.size() && idx2 < feature_vectors.size()) {
                 // Use the metrics from the separate metrics file for distance calculation
@@ -118,7 +118,7 @@ namespace our_math {
         return dis(gen);
     }
     
-    inline uint32_t next_prime(uint32_t n) {
+    uint32_t next_prime(uint32_t n) {
         if (n <= 2) return 2;
         if (n == 3) return 3;
         

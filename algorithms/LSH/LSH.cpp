@@ -12,8 +12,8 @@ template <typename T>
 LSH<T>::LSH(uint32_t L, uint64_t m, uint32_t M, uint32_t n_points, 
             uint32_t k, uint32_t space_dim, uint32_t w, 
             std::vector<std::vector<T>> init_vectors, int seed)
-    : L(L), m(m), n_points(n_points), k(k), w(w), 
-      space_dim(space_dim), feature_vectors(std::move(init_vectors)),
+    : L(L), m(m), M(M), n_points(n_points), k(k), 
+      space_dim(space_dim), w(w), feature_vectors(std::move(init_vectors)),
       r1(0.0), r2(0.0), P1(0.0), P2(0.0) {
     
     // Note: m should be prime M = 2^32 - 5 = 4294967291 for classic hash function
@@ -131,8 +131,8 @@ LSH<T>::LSH(double r1, double r2, double P1, double P2,
             uint32_t space_dim, uint32_t w,
             std::vector<std::vector<T>> init_vectors,
             double target_success_prob, int seed)
-    : r1(r1), r2(r2), P1(P1), P2(P2), space_dim(space_dim), w(w),
-      feature_vectors(std::move(init_vectors)) {
+    : space_dim(space_dim), w(w), feature_vectors(std::move(init_vectors)),
+      r1(r1), r2(r2), P1(P1), P2(P2) {
     
     // Validate LSH parameters
     if (r1 >= r2) {

@@ -21,8 +21,11 @@ class LSH {
         uint32_t M; // TableSize: size of each hash table (heuristic: n/4, n/8, or n/16)
         uint32_t n_points; // number of points to be hashed initially
         uint32_t k; // given from the user, affects number of the buckets
-        uint32_t w; // a number significantly larger than the radius, affects range search
         uint32_t space_dim; // the dimension of the space we are going to work with
+        uint32_t w; // a number significantly larger than the radius, affects range search
+        
+        // vector of the vectors given to us, stored here for convenience
+        std::vector<std::vector<T>> feature_vectors;
         
         // LSH sensitivity parameters (r1, r2, P1, P2)-sensitive
         double r1; // Near distance threshold
@@ -36,9 +39,6 @@ class LSH {
         // vector of hash tables used by LSH. Each table stores (index, ID) pairs
         // ID = sum(ri*hi(p)) mod M enables efficient querying: only compute distance when ID(p) = ID(q)
         std::vector<std::unordered_map<uint32_t, std::vector<std::pair<int, uint64_t>>>> lsh_tables;
-
-        // vector of the vectors given to us, stored here for convenience
-        std::vector<std::vector<T>> feature_vectors;
 
     public:
         // constructor of the LSH class

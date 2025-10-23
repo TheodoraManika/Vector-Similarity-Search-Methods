@@ -467,13 +467,13 @@ namespace MNIST {
             int shift_y = shift_dist(gen);
             
             // Apply translation and add noise
-            for (int y = 0; y < MNIST_IMAGE_HEIGHT; ++y) {
-                for (int x = 0; x < MNIST_IMAGE_WIDTH; ++x) {
-                    int src_x = x - shift_x;
-                    int src_y = y - shift_y;
+            for (uint32_t y = 0; y < MNIST_IMAGE_HEIGHT; ++y) {
+                for (uint32_t x = 0; x < MNIST_IMAGE_WIDTH; ++x) {
+                    int src_x = static_cast<int>(x) - shift_x;
+                    int src_y = static_cast<int>(y) - shift_y;
                     
-                    if (src_x >= 0 && src_x < MNIST_IMAGE_WIDTH && 
-                        src_y >= 0 && src_y < MNIST_IMAGE_HEIGHT) {
+                    if (src_x >= 0 && src_x < static_cast<int>(MNIST_IMAGE_WIDTH) && 
+                        src_y >= 0 && src_y < static_cast<int>(MNIST_IMAGE_HEIGHT)) {
                         float pixel = image[src_y * MNIST_IMAGE_WIDTH + src_x];
                         pixel += noise_dist(gen);
                         pixel = (pixel < 0.0f) ? 0.0f : ((pixel > 255.0f) ? 255.0f : pixel);
