@@ -534,11 +534,11 @@ std::list<std::pair<int, T>> LSH<T>::RangeSearch(const std::vector<T>& query_vec
                     continue; // Skip invalid indices
                 }
                 
-                // Only compute distance if IDs match (querying trick)
-                // ID(p) = ID(q) is a necessary condition for collision in the same w-cell
-                if (candidate_id != query_id) {
-                    continue;
-                }
+                // For RangeSearch, we check all candidates in the bucket
+                // (ID filtering is too restrictive for range queries)
+                // However, we still use candidate_id for completeness (it's computed during preprocessing)
+                (void)candidate_id; // Mark as intentionally unused
+                (void)query_id;     // Mark as intentionally unused
                 
                 // Compute actual distance
                 T distance = metrics::EuclideanDistance(query_vector, feature_vectors[candidate_idx], static_cast<int>(query_vector.size()));

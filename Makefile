@@ -141,10 +141,10 @@ install: $(TARGET)
 
 # Test targets
 test-lsh-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh_sift.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 4 -R 500.0 -range true
 
 test-lsh-mnist: $(TARGET)
-	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_lsh_mnist.txt -type mnist -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2000.0
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_lsh_mnist.txt -type mnist -lsh -k 4 -L 5 -w 4.0 -N 4 -R 1500.0 -range true
 
 # Alias for backward compatibility
 test-lsh: test-lsh-sift
