@@ -91,7 +91,10 @@ public:
     
     // Evaluation metrics
     T get_inertia() const;
-    T get_silhouette_score() const;
+    T get_silhouette_score() const;                          // Overall clustering silhouette
+    std::vector<T> get_cluster_silhouettes() const;          // Per-cluster average silhouettes
+    std::vector<T> get_point_silhouettes() const;            // Individual point silhouettes
+    void print_silhouette_analysis() const;                  // Detailed silhouette report
     
     // Utility methods
     void print_cluster_info() const;
