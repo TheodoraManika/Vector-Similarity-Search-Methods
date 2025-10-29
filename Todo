@@ -1,7 +1,7 @@
 Responsibilities Theodora:
-- [ ] Random Projection
+- [ ] hypercube
 - [ ] IVFPQ
-- [ ] SIFT
+- [✓] SIFT
 
 Responsibilities Myrto:
 - [ ] LSH
@@ -15,7 +15,10 @@ To do Theodora:
 - [✓] SIFT parse input 
 - [✓] hypercube.h and .cpp
 - [✓] other helpful function
-- [ ] checking hypercube implementation until correct
+- [✓] checking hypercube implementation until correct
+- [ ] make sure hypercube works 
+- [ ] make sure timer works as intended
+- [ ] make sure i have the correct input values for hypercube from the command line 
  
 To do Myrto:
 - [✓] διαβάζεις διαφάνειες και βλέπεις αν πρέπει να γίνει κάποια αλλαγή στους κώδικες πχ κάποια πράξη δεν έγινε για lsh
