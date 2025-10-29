@@ -209,9 +209,10 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     // Print method name
     output << "LSH" << std::endl;
     
-    auto start_time = std::chrono::high_resolution_clock::now();
-    auto total_approx_time = std::chrono::duration<double>::zero();
-    auto total_true_time = std::chrono::duration<double>::zero();
+    Utils::AutoTimer total_timer;
+    total_timer.start();
+    double total_approx_time = 0.0;
+    double total_true_time = 0.0;
     double total_af = 0.0;
     double total_recall = 0.0;
     int valid_queries = 0;
@@ -222,7 +223,8 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         output << "Query: " << query_idx << std::endl;
         
         // Approximate search using LSH
-        auto approx_start = std::chrono::high_resolution_clock::now();
+        Utils::AutoTimer approx_timer;
+        approx_timer.start();
         std::list<std::pair<int, float>> neighbors;
         
         if (N == 1) {
@@ -233,11 +235,11 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         } else {
             neighbors = lsh.kNearestNeighbour(query, N);
         }
-        auto approx_end = std::chrono::high_resolution_clock::now();
-        total_approx_time += approx_end - approx_start;
+        total_approx_time += approx_timer.elapsed();
         
         // True (brute force) search
-        auto true_start = std::chrono::high_resolution_clock::now();
+        Utils::AutoTimer true_timer;
+        true_timer.start();
         std::vector<std::pair<float, int>> all_distances;
         all_distances.reserve(dataset.size());
         
@@ -254,8 +256,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         for (int i = 0; i < N && i < static_cast<int>(all_distances.size()); ++i) {
             true_neighbors.emplace_back(all_distances[i].second, all_distances[i].first);
         }
-        auto true_end = std::chrono::high_resolution_clock::now();
-        total_true_time += true_end - true_start;
+        total_true_time += true_timer.elapsed();
         
         // Calculate AF (Approximation Factor) for this query
         // AF = distanceApproximate / distanceTrue for the first neighbor
@@ -327,15 +328,13 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         }
     }
     
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto total_time = end_time - start_time;
-    double total_time_seconds = std::chrono::duration<double>(total_time).count();
+    double total_time_seconds = total_timer.elapsed();
     
     // Calculate average metrics
     double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
     double recall_at_n = valid_queries > 0 ? total_recall / valid_queries : 0.0;
-    double avg_approx_time = total_approx_time.count() / queries.size();
-    double avg_true_time = total_true_time.count() / queries.size();
+    double avg_approx_time = total_approx_time / queries.size();
+    double avg_true_time = total_true_time / queries.size();
     double qps = total_time_seconds > 0 ? queries.size() / total_time_seconds : 0.0;
     
     // Output final statistics according to specification
@@ -392,9 +391,10 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     // Print method name
     output << "Hypercube" << std::endl;
     
-    auto start_time = std::chrono::high_resolution_clock::now();
-    auto total_approx_time = std::chrono::duration<double>::zero();
-    auto total_true_time = std::chrono::duration<double>::zero();
+    Utils::AutoTimer total_timer;
+    total_timer.start();
+    double total_approx_time = 0.0;
+    double total_true_time = 0.0;
     
     int successful_queries = 0;
     double total_af = 0.0;
@@ -406,13 +406,14 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
         
         try {
             // Approximate search using Hypercube
-            auto approx_start = std::chrono::high_resolution_clock::now();
+            Utils::AutoTimer approx_timer;
+            approx_timer.start();
             auto neighbors = hypercube.kNearestNeighbour(queries[query_idx], N);
-            auto approx_end = std::chrono::high_resolution_clock::now();
-            total_approx_time += approx_end - approx_start;
+            total_approx_time += approx_timer.elapsed();
             
             // True nearest neighbors (brute force)
-            auto true_start = std::chrono::high_resolution_clock::now();
+            Utils::AutoTimer true_timer;
+            true_timer.start();
             std::vector<std::pair<float, int>> all_distances;
             all_distances.reserve(dataset.size());
             
@@ -424,8 +425,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
             std::partial_sort(all_distances.begin(), 
                              all_distances.begin() + std::min(N, static_cast<int>(all_distances.size())),
                              all_distances.end());
-            auto true_end = std::chrono::high_resolution_clock::now();
-            total_true_time += true_end - true_start;
+            total_true_time += true_timer.elapsed();
             
             // Output neighbors according to PDF format
             auto neighbor_it = neighbors.begin();
@@ -478,15 +478,14 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
         }
     }
     
-    auto end_time = std::chrono::high_resolution_clock::now();
-    auto total_time = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time);
+    double total_time_seconds = total_timer.elapsed();
     
     // Calculate statistics and output final results according to PDF specification
     double avg_af = successful_queries > 0 ? total_af / successful_queries : 0.0;
     double avg_recall = successful_queries > 0 ? total_af / successful_queries : 0.0; // Using AF as placeholder for recall
-    double avg_approx_time = total_approx_time.count() / max_queries;
-    double avg_true_time = total_true_time.count() / max_queries;
-    double qps = max_queries / total_time.count();
+    double avg_approx_time = total_approx_time / max_queries;
+    double avg_true_time = total_true_time / max_queries;
+    double qps = max_queries / total_time_seconds;
     
     // Output final statistics according to PDF specification
     printFinalStatistics(output, avg_af, avg_recall, qps, avg_approx_time, avg_true_time);
