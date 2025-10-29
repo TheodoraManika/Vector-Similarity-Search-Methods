@@ -43,7 +43,7 @@ public:
     
     int executeHypercube(const std::string& input_file, const std::string& query_file,
                         const std::string& output_file, const std::string& type,
-                        int kproj, double w, int M, int probes, int N, double R, bool range);
+                        int kproj, double w, int M, int probes, int N, double R, bool range, int seed);
     
     int executeIVFFlat(const std::string& input_file, const std::string& query_file,
                       const std::string& output_file, const std::string& type,

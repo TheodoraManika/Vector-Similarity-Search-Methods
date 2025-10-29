@@ -50,7 +50,7 @@ int Interface::runSearch(int argc, char* argv[]) {
             return executeLSH(input_file, query_file, output_file, type, k, L, w, N, R, range);
         }
         else if (method == "hypercube") {
-            return executeHypercube(input_file, query_file, output_file, type, kproj, w, M, probes, N, R, range);
+            return executeHypercube(input_file, query_file, output_file, type, kproj, w, M, probes, N, R, range, seed);
         }
         else if (method == "ivfflat") {
             return executeIVFFlat(input_file, query_file, output_file, type, kclusters, nprobe, N, R, range, seed);
@@ -353,11 +353,11 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
 
 int Interface::executeHypercube(const std::string& input_file, const std::string& query_file,
                                const std::string& output_file, const std::string& type,
-                               int kproj, double w, int M, int probes, int N, double R, bool range) {
+                               int kproj, double w, int M, int probes, int N, double R, bool range, int seed) {
     
     std::cout << "Executing Hypercube algorithm..." << std::endl;
     std::cout << "Parameters: kproj=" << kproj << ", w=" << w << ", M=" << M 
-              << ", probes=" << probes << ", N=" << N << ", R=" << R << std::endl;
+              << ", probes=" << probes << ", N=" << N << ", R=" << R << ", seed=" << seed << std::endl;
     
     // Parse datasets
     auto dataset = parseDataset(input_file, type);
@@ -377,9 +377,8 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
               << dataset[0].size() << " dimensions" << std::endl;
     std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
     
-    // Initialize Hypercube with seed=1 (default)
+    // Initialize Hypercube with specified seed parameter
     uint64_t m = 4294967291ULL; // 2^32 - 5
-    uint32_t seed = 1;
     Hypercube<float> hypercube(kproj, m, M, probes, dataset.size(), w, dataset[0].size(), dataset, seed);
     
     // Ensure output file goes to results directory
@@ -620,7 +619,7 @@ void Interface::printUsage() {
     std::cout << "\nHypercube:" << std::endl;
     std::cout << "./search -d <input file> -q <query file> -kproj <int> -w <double> -M <int>" << std::endl;
     std::cout << "         -probes <int> -o <output file> -N <number of nearest> -R <radius>" << std::endl;
-    std::cout << "         -type <flag> -range <true|false> -hypercube" << std::endl;
+    std::cout << "         -type <flag> -range <true|false> -hypercube -seed <int>" << std::endl;
     
     std::cout << "\nIVFFlat:" << std::endl;
     std::cout << "./search -d <input file> -q <query file> -kclusters <int> -nprobe <int>" << std::endl;

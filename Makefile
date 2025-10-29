@@ -149,8 +149,11 @@ test-lsh-mnist: $(TARGET)
 # Alias for backward compatibility
 test-lsh: test-lsh-sift
 
-test-hypercube: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 1 -R 2.0
+test-hypercube-sift: $(TARGET)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube_sift.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 4 -R 500.0 -range true 
+
+test-hypercube-mnist: $(TARGET)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_hypercube_mnist.txt -type mnist -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 4 -R 1500.0 -range true 
 
 test-ivfflat: $(TARGET)
 	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0
