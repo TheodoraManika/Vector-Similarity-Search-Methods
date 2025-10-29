@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <numeric>
 #include <unordered_set>
+#include <iomanip>
 
 template <typename T>
 KMeans<T>::KMeans(uint32_t k, uint32_t max_iterations, T tolerance)
@@ -102,19 +103,34 @@ void KMeans<T>::initialize_centroids_random() {
 
 template <typename T>
 void KMeans<T>::initialize_centroids_kmeans_plus_plus() {
-    // Choose first centroid randomly
+    // k-means++ initialization [Arthur-Vassilvitskii:SODA'07]
+    // Expected approximation ratio: O(log k)
+    // Algorithm:
+    // (1) Choose a centroid uniformly at random; t ← 1
+    // (2) For all non-centroid points i: D(i) ← min distance to existing centroids
+    // (3) Choose new centroid r with probability ∝ D(r)²:
+    //     prob[choose r] = D(r)² / Σ D(i)²
+    // (4) Let t ← t + 1, repeat (2)-(3) until t = k
+    
+    // Efficient implementation using partial sums and binary search:
+    // Compute partial sums P(r) = Σ(i=1 to r) D(i)²
+    // Normalize D(i) by max D(i) to avoid overflow
+    // Use binary search to find r where P(r-1) < x ≤ P(r)
+    
+    // Step (1): Choose first centroid uniformly at random
     std::uniform_int_distribution<> dis(0, data_points.size() - 1);
     clusters[0].centroid = data_points[dis(rng)];
     
-    // Choose remaining centroids using k-means++
-    for (uint32_t cluster_idx = 1; cluster_idx < k; ++cluster_idx) {
+    // Steps (2)-(4): Choose remaining centroids using k-means++
+    for (uint32_t cluster_idx = 1; cluster_idx < k; ++cluster_idx) {  // t = 1 to k-1
         std::vector<T> distances(data_points.size());
-        T total_distance = 0;
+        T max_distance = 0;
         
-        // Compute distances to nearest existing centroid
+        // Step (2): Compute D(i) = min distance to existing centroids
         for (size_t point_idx = 0; point_idx < data_points.size(); ++point_idx) {
             T min_distance = std::numeric_limits<T>::max();
             
+            // D(i) = min distance to any of the t chosen centroids
             for (uint32_t existing_cluster = 0; existing_cluster < cluster_idx; ++existing_cluster) {
                 T distance = metrics::EuclideanDistance(data_points[point_idx], 
                                                        clusters[existing_cluster].centroid,
@@ -122,27 +138,58 @@ void KMeans<T>::initialize_centroids_kmeans_plus_plus() {
                 min_distance = std::min(min_distance, distance);
             }
             
-            distances[point_idx] = min_distance * min_distance; // Squared distance
-            total_distance += distances[point_idx];
+            distances[point_idx] = min_distance;
+            max_distance = std::max(max_distance, min_distance);
         }
         
-        // Choose next centroid with probability proportional to squared distance
-        std::uniform_real_distribution<T> prob_dis(0, total_distance);
+        // Normalize distances by max D(i) to avoid overflow
+        // and compute partial sums P(r) = Σ(i=1 to r) D(i)²
+        std::vector<T> partial_sums(data_points.size());
+        T cumulative = 0;
+        
+        for (size_t point_idx = 0; point_idx < data_points.size(); ++point_idx) {
+            // Normalize: D(i) / max D(i), then square
+            T normalized_dist = (max_distance > 0) ? (distances[point_idx] / max_distance) : 0;
+            T squared_dist = normalized_dist * normalized_dist;
+            
+            // P(r) = Σ(i=1 to r) D(i)²
+            cumulative += squared_dist;
+            partial_sums[point_idx] = cumulative;
+        }
+        
+        // Step (3): Choose next centroid with probability ∝ D(r)²
+        // Pick uniformly distributed x ∈ [0, P(n-t)]
+        T total_sum = partial_sums.back();
+        if (total_sum <= 0) {
+            // Fallback to random selection if all distances are 0
+            clusters[cluster_idx].centroid = data_points[dis(rng)];
+            continue;
+        }
+        
+        std::uniform_real_distribution<T> prob_dis(0, total_sum);
         T target = prob_dis(rng);
         
-        T cumulative = 0;
-        for (size_t point_idx = 0; point_idx < data_points.size(); ++point_idx) {
-            cumulative += distances[point_idx];
-            if (cumulative >= target) {
-                clusters[cluster_idx].centroid = data_points[point_idx];
-                break;
-            }
+        // Binary search to find r where P(r-1) < target ≤ P(r)
+        // This is equivalent to std::lower_bound
+        auto it = std::lower_bound(partial_sums.begin(), partial_sums.end(), target);
+        size_t selected_idx = std::distance(partial_sums.begin(), it);
+        
+        // Ensure valid index
+        if (selected_idx >= data_points.size()) {
+            selected_idx = data_points.size() - 1;
         }
+        
+        clusters[cluster_idx].centroid = data_points[selected_idx];
     }
 }
 
 template <typename T>
 void KMeans<T>::assign_points_to_clusters() {
+    // E-step (Expectation): Assignment phase
+    // For each point xi, find d(xi, C) = min_{c∈C} d(xi, c)
+    // Assign xi to cluster with nearest centroid
+    // Complexity: O(nkd) where n=#points, k=#clusters, d=#dimensions
+    
     // Clear existing assignments
     for (auto& cluster : clusters) {
         cluster.clear_points();
@@ -153,6 +200,7 @@ void KMeans<T>::assign_points_to_clusters() {
         T min_distance = std::numeric_limits<T>::max();
         uint32_t best_cluster = 0;
         
+        // Find nearest centroid: min_{c∈C} d(xi, c)
         for (uint32_t cluster_idx = 0; cluster_idx < k; ++cluster_idx) {
             T distance = metrics::EuclideanDistance(data_points[point_idx], 
                                                    clusters[cluster_idx].centroid,
@@ -301,6 +349,11 @@ void KMeans<T>::assign_points_to_clusters_reverse_lsh() {
 
 template <typename T>
 bool KMeans<T>::update_centroids() {
+    // M-step (Maximization): Update phase
+    // For each cluster C, calculate new centroid as mean of assigned points:
+    // centroid = (1/T) * Σ vi where T = #points in cluster
+    // Complexity: O(nd) where n=#points, d=#dimensions
+    
     bool converged = true;
     
     for (uint32_t cluster_idx = 0; cluster_idx < k; ++cluster_idx) {
@@ -314,19 +367,22 @@ bool KMeans<T>::update_centroids() {
             continue;
         }
         
-        // Calculate new centroid
+        // Calculate new centroid: (1/T) * Σ vi
         std::vector<T> new_centroid(dimensions, 0);
+        
+        // Sum all points in cluster: Σ vi
         for (int point_idx : cluster.point_indices) {
             for (size_t dim = 0; dim < dimensions; ++dim) {
                 new_centroid[dim] += data_points[point_idx][dim];
             }
         }
         
+        // Divide by T (number of points in cluster): (1/T) * Σ vi
         for (size_t dim = 0; dim < dimensions; ++dim) {
             new_centroid[dim] /= cluster.size();
         }
         
-        // Check for convergence
+        // Check for convergence (little change in centroids)
         T distance = metrics::EuclideanDistance(cluster.centroid, new_centroid, cluster.centroid.size());
         if (distance > tolerance) {
             converged = false;
@@ -353,17 +409,34 @@ bool KMeans<T>::fit() {
     // Initialize centroids using k-means++
     initialize_centroids_kmeans_plus_plus();
     
+    // Track objective value (inertia) for convergence monitoring
+    T previous_inertia = std::numeric_limits<T>::max();
+    
     // Main k-means loop
     for (uint32_t iteration = 0; iteration < max_iterations; ++iteration) {
+        // E-step: Assignment - assign each point to nearest centroid
         assign_points_to_clusters();
         
-        if (update_centroids()) {
+        // M-step: Update - recalculate centroids as mean of assigned points
+        bool centroids_converged = update_centroids();
+        
+        // Calculate k-means objective: Σ d(xi, C)²
+        T current_inertia = get_inertia();
+        
+        // Check convergence based on objective change
+        T inertia_change = std::abs(previous_inertia - current_inertia);
+        
+        if (centroids_converged && inertia_change < tolerance) {
             std::cout << "K-means converged after " << iteration + 1 << " iterations" << std::endl;
+            std::cout << "Final objective (inertia): " << current_inertia << std::endl;
             return true;
         }
+        
+        previous_inertia = current_inertia;
     }
     
     std::cout << "K-means reached maximum iterations (" << max_iterations << ")" << std::endl;
+    std::cout << "Final objective (inertia): " << previous_inertia << std::endl;
     return false;
 }
 
@@ -500,11 +573,17 @@ std::vector<int> KMeans<T>::get_labels() const {
 
 template <typename T>
 T KMeans<T>::get_inertia() const {
+    // K-means objective function: min_{C⊆Z,|C|=k} Σ d(xi, C)²
+    // where d(xi, C) = min_{c∈C} d(xi, c)
+    // This is the sum of squared distances from each point to its assigned centroid
+    // Also known as "within-cluster sum of squares" (WCSS) or "inertia"
     T inertia = 0;
     
     for (const auto& cluster : clusters) {
         for (int point_idx : cluster.point_indices) {
+            // d(xi, centroid) using Euclidean distance (ℓ2 metric)
             T distance = metrics::EuclideanDistance(data_points[point_idx], cluster.centroid, data_points[point_idx].size());
+            // Sum of squared distances: Σ d(xi, C)²
             inertia += distance * distance;
         }
     }
@@ -514,7 +593,13 @@ T KMeans<T>::get_inertia() const {
 
 template <typename T>
 T KMeans<T>::get_silhouette_score() const {
-    if (clusters.size() < 2) return 0;
+    // Silhouette Coefficient: measures quality of clustering
+    // Average silhouette over all points ∈ [-1, 1]
+    // s(i) → 1: point i well-clustered (correctly assigned)
+    // s(i) ≃ 0: borderline assignment (on cluster boundary)
+    // s(i) → -1: point i would be better in next best cluster (misclassified)
+    
+    if (clusters.size() < 2) return 0;  // Need at least 2 clusters
     
     std::vector<int> labels = get_labels();
     T total_silhouette = 0;
@@ -522,7 +607,75 @@ T KMeans<T>::get_silhouette_score() const {
     
     for (size_t i = 0; i < data_points.size(); ++i) {
         int cluster_a = labels[i];
-        if (clusters[cluster_a].size() <= 1) continue;
+        if (clusters[cluster_a].size() <= 1) continue;  // Skip singleton clusters
+        
+        // a(i) = average distance of point i to all other points in same cluster
+        // a(i) measures how well point i fits into its assigned cluster
+        T a = 0;
+        for (int j : clusters[cluster_a].point_indices) {
+            if (j != static_cast<int>(i)) {
+                a += metrics::EuclideanDistance(data_points[i], data_points[j], data_points[i].size());
+            }
+        }
+        a /= (clusters[cluster_a].size() - 1);  // Average over all other points in cluster
+        
+        // b(i) = average distance of point i to all points in next best (neighbor) cluster
+        // "Next best" = cluster with minimum average distance (excluding current cluster)
+        // This is the cluster of the 2nd closest centroid
+        T b = std::numeric_limits<T>::max();
+        for (size_t cluster_idx = 0; cluster_idx < clusters.size(); ++cluster_idx) {
+            if (cluster_idx == static_cast<size_t>(cluster_a) || clusters[cluster_idx].size() == 0) {
+                continue;  // Skip current cluster and empty clusters
+            }
+            
+            T avg_distance = 0;
+            for (int j : clusters[cluster_idx].point_indices) {
+                avg_distance += metrics::EuclideanDistance(data_points[i], data_points[j], data_points[i].size());
+            }
+            avg_distance /= clusters[cluster_idx].size();
+            b = std::min(b, avg_distance);  // Find minimum average distance
+        }
+        
+        // Silhouette coefficient for point i:
+        // s(i) = (b(i) - a(i)) / max{a(i), b(i)} ∈ [-1, 1]
+        //
+        // Equivalent formulation:
+        //   s(i) = 1 - a(i)/b(i),     if a(i) < b(i)  [good: closer to own cluster]
+        //   s(i) = 0,                  if a(i) = b(i)  [borderline]
+        //   s(i) = b(i)/a(i) - 1,     if a(i) > b(i)  [bad: closer to other cluster]
+        if (b != std::numeric_limits<T>::max()) {
+            T silhouette = (b - a) / std::max(a, b);
+            total_silhouette += silhouette;
+            valid_points++;
+        }
+    }
+    
+    // Return average silhouette coefficient over all valid points
+    return valid_points > 0 ? total_silhouette / valid_points : 0;
+}
+
+template <typename T>
+std::vector<T> KMeans<T>::get_point_silhouettes() const {
+    // Compute silhouette coefficient for each individual point
+    // Returns vector of s(i) values for all points i = 0, ..., n-1
+    // Points in singleton clusters get s(i) = 0
+    
+    std::vector<T> silhouettes(data_points.size(), 0);
+    
+    if (clusters.size() < 2) {
+        return silhouettes;  // Need at least 2 clusters
+    }
+    
+    std::vector<int> labels = get_labels();
+    
+    for (size_t i = 0; i < data_points.size(); ++i) {
+        int cluster_a = labels[i];
+        
+        // Singleton clusters have undefined silhouette, set to 0
+        if (clusters[cluster_a].size() <= 1) {
+            silhouettes[i] = 0;
+            continue;
+        }
         
         // Calculate a(i) - average distance to points in same cluster
         T a = 0;
@@ -550,13 +703,168 @@ T KMeans<T>::get_silhouette_score() const {
         
         // Calculate silhouette coefficient
         if (b != std::numeric_limits<T>::max()) {
-            T silhouette = (b - a) / std::max(a, b);
-            total_silhouette += silhouette;
-            valid_points++;
+            silhouettes[i] = (b - a) / std::max(a, b);
         }
     }
     
-    return valid_points > 0 ? total_silhouette / valid_points : 0;
+    return silhouettes;
+}
+
+template <typename T>
+std::vector<T> KMeans<T>::get_cluster_silhouettes() const {
+    // Compute average silhouette coefficient for each cluster
+    // Returns vector of average s(i) for points in each cluster
+    // 
+    // Interpretation:
+    // - High value: cluster is well-separated and cohesive
+    // - Low value: cluster may indicate poor k choice or outliers
+    // 
+    // If k is too large/small, some clusters will have much smaller
+    // silhouettes than others
+    
+    std::vector<T> cluster_silhouettes(clusters.size(), 0);
+    
+    if (clusters.size() < 2) {
+        return cluster_silhouettes;  // Need at least 2 clusters
+    }
+    
+    // Get silhouette for each point
+    std::vector<T> point_silhouettes = get_point_silhouettes();
+    std::vector<int> labels = get_labels();
+    
+    // Accumulate silhouettes per cluster
+    std::vector<T> cluster_sums(clusters.size(), 0);
+    std::vector<int> cluster_counts(clusters.size(), 0);
+    
+    for (size_t i = 0; i < data_points.size(); ++i) {
+        int cluster_idx = labels[i];
+        
+        // Only count non-singleton clusters
+        if (clusters[cluster_idx].size() > 1) {
+            cluster_sums[cluster_idx] += point_silhouettes[i];
+            cluster_counts[cluster_idx]++;
+        }
+    }
+    
+    // Compute average per cluster
+    for (size_t c = 0; c < clusters.size(); ++c) {
+        if (cluster_counts[c] > 0) {
+            cluster_silhouettes[c] = cluster_sums[c] / cluster_counts[c];
+        }
+    }
+    
+    return cluster_silhouettes;
+}
+
+template <typename T>
+void KMeans<T>::print_silhouette_analysis() const {
+    // Print detailed silhouette analysis for clustering quality assessment
+    // Includes overall score, per-cluster scores, and interpretation
+    
+    std::cout << "\n=== Silhouette Analysis ===" << std::endl;
+    std::cout << std::fixed << std::setprecision(4);
+    
+    // Overall silhouette
+    T overall_silhouette = get_silhouette_score();
+    std::cout << "\nOverall Silhouette Coefficient: " << overall_silhouette << std::endl;
+    std::cout << "Interpretation: ";
+    if (overall_silhouette > 0.70) {
+        std::cout << "Excellent clustering (strong structure)" << std::endl;
+    } else if (overall_silhouette > 0.50) {
+        std::cout << "Good clustering (reasonable structure)" << std::endl;
+    } else if (overall_silhouette > 0.25) {
+        std::cout << "Fair clustering (weak structure)" << std::endl;
+    } else {
+        std::cout << "Poor clustering (no substantial structure)" << std::endl;
+    }
+    
+    // Per-cluster silhouettes
+    std::vector<T> cluster_silhouettes = get_cluster_silhouettes();
+    
+    std::cout << "\nPer-Cluster Silhouette Scores:" << std::endl;
+    std::cout << "-------------------------------" << std::endl;
+    
+    T min_silhouette = std::numeric_limits<T>::max();
+    T max_silhouette = std::numeric_limits<T>::lowest();
+    size_t min_cluster = 0, max_cluster = 0;
+    
+    for (size_t c = 0; c < cluster_silhouettes.size(); ++c) {
+        if (clusters[c].size() == 0) continue;
+        
+        T score = cluster_silhouettes[c];
+        std::cout << "  Cluster " << c << " (n=" << std::setw(5) << clusters[c].size() 
+                  << "): " << std::setw(7) << score;
+        
+        // Track min/max
+        if (score < min_silhouette && clusters[c].size() > 1) {
+            min_silhouette = score;
+            min_cluster = c;
+        }
+        if (score > max_silhouette) {
+            max_silhouette = score;
+            max_cluster = c;
+        }
+        
+        // Add interpretation
+        if (score > 0.70) {
+            std::cout << " [Excellent]";
+        } else if (score > 0.50) {
+            std::cout << " [Good]";
+        } else if (score > 0.25) {
+            std::cout << " [Fair]";
+        } else if (score > 0) {
+            std::cout << " [Poor]";
+        } else if (clusters[c].size() == 1) {
+            std::cout << " [Singleton]";
+        }
+        std::cout << std::endl;
+    }
+    
+    // Analysis of cluster quality variation
+    if (cluster_silhouettes.size() > 1 && max_silhouette > min_silhouette) {
+        T silhouette_range = max_silhouette - min_silhouette;
+        
+        std::cout << "\nCluster Quality Analysis:" << std::endl;
+        std::cout << "  Best cluster:  " << max_cluster << " (s=" << max_silhouette << ")" << std::endl;
+        std::cout << "  Worst cluster: " << min_cluster << " (s=" << min_silhouette << ")" << std::endl;
+        std::cout << "  Range: " << silhouette_range << std::endl;
+        
+        if (silhouette_range > 0.3) {
+            std::cout << "\n⚠ WARNING: Large variation in cluster quality!" << std::endl;
+            std::cout << "  This may indicate:" << std::endl;
+            std::cout << "  - k is too large (over-clustering)" << std::endl;
+            std::cout << "  - k is too small (under-clustering)" << std::endl;
+            std::cout << "  - Presence of outliers" << std::endl;
+            std::cout << "  - Unbalanced cluster sizes" << std::endl;
+            std::cout << "\n  Suggestion: Try different values of k and compare" << std::endl;
+            std::cout << "              silhouette plots for more uniform scores." << std::endl;
+        } else {
+            std::cout << "\n✓ Clusters have roughly equal silhouettes (good k choice)" << std::endl;
+        }
+    }
+    
+    // Distribution statistics
+    std::vector<T> point_silhouettes = get_point_silhouettes();
+    int well_clustered = 0, borderline = 0, misclassified = 0;
+    
+    for (T s : point_silhouettes) {
+        if (s > 0.5) well_clustered++;
+        else if (s > -0.1) borderline++;
+        else misclassified++;
+    }
+    
+    std::cout << "\nPoint Classification:" << std::endl;
+    std::cout << "  Well clustered (s > 0.5):   " << std::setw(5) << well_clustered 
+              << " (" << std::setw(5) << std::setprecision(1) 
+              << (100.0 * well_clustered / data_points.size()) << "%)" << std::endl;
+    std::cout << "  Borderline (-0.1 < s ≤ 0.5): " << std::setw(5) << borderline 
+              << " (" << std::setw(5) << std::setprecision(1) 
+              << (100.0 * borderline / data_points.size()) << "%)" << std::endl;
+    std::cout << "  Misclassified (s ≤ -0.1):   " << std::setw(5) << misclassified 
+              << " (" << std::setw(5) << std::setprecision(1) 
+              << (100.0 * misclassified / data_points.size()) << "%)" << std::endl;
+    
+    std::cout << "\n==========================" << std::endl;
 }
 
 template <typename T>
