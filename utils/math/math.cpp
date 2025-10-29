@@ -1,121 +1,13 @@
 #include "math.h"
-#include <random>
-#include <chrono>
-#include <algorithm>
 #include <cmath>
-#include <numeric>
 
 namespace our_math {
-    
-    inline int modulo(int a, int b) {
-        int r = a % b;
-        return r < 0 ? r + b : r;
-    }
-    
-    inline int modular_power(int x, int y, int p) {
-        long long result = 1;
-        long long base = modulo(x, p);
-        
-        while (y > 0) {
-            if (y & 1) {
-                result = (result * base) % p;
-            }
-            y >>= 1;
-            base = (base * base) % p;
-        }
-        
-        return static_cast<int>(result);
-    }
     
     int big_to_little_endian(int i) {
         return ((i & 0xFF000000) >> 24) |
                ((i & 0x00FF0000) >> 8)  |
                ((i & 0x0000FF00) << 8)  |
                ((i & 0x000000FF) << 24);
-    }
-    
-    uint32_t bitwise_concat(uint16_t current, uint32_t next, int k) {
-        // Shift current left by k bits and OR with next
-        return (static_cast<uint32_t>(current) << k) | (next & ((1U << k) - 1));
-    }
-    
-    inline double compute_w_value(const std::vector<std::vector<double>>& feature_vectors, int n_images) {
-        if (feature_vectors.empty() || n_images <= 0) {
-            return 400.0; // Default value
-        }
-        
-        std::vector<double> distances;
-        
-        // Sample distances between random pairs
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(0, std::min(n_images, static_cast<int>(feature_vectors.size())) - 1);
-        
-        int sample_size = std::min(1000, n_images * n_images / 4); // Sample up to 1000 pairs
-        
-        for (int i = 0; i < sample_size; ++i) {
-            size_t idx1 = static_cast<size_t>(dis(gen));
-            size_t idx2 = static_cast<size_t>(dis(gen));
-            
-            if (idx1 != idx2 && idx1 < feature_vectors.size() && idx2 < feature_vectors.size()) {
-                // Use the metrics from the separate metrics file for distance calculation
-                // This will be computed using the metrics::EuclideanDistance function
-                double dist = 0.0;
-                for (size_t j = 0; j < feature_vectors[idx1].size(); ++j) {
-                    double diff = feature_vectors[idx1][j] - feature_vectors[idx2][j];
-                    dist += diff * diff;
-                }
-                dist = std::sqrt(dist);
-                distances.push_back(dist);
-            }
-        }
-        
-        if (distances.empty()) {
-            return 400.0;
-        }
-        
-        // Use median distance as basis for w
-        double median_dist = median(distances);
-        return median_dist * 4.0; // Empirical factor
-    }
-    
-    inline std::list<int> hamming_distance_1(int number, int k) {
-        std::list<int> neighbors;
-        
-        for (int i = 0; i < k; ++i) {
-            int neighbor = number ^ (1 << i); // Flip bit at position i
-            neighbors.push_back(neighbor);
-        }
-        
-        return neighbors;
-    }
-    
-    inline int hamming_distance(int a, int b) {
-        int xor_result = a ^ b;
-        int distance = 0;
-        
-        while (xor_result) {
-            distance += xor_result & 1;
-            xor_result >>= 1;
-        }
-        
-        return distance;
-    }
-    
-    inline float random_float(float min, float max) {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::uniform_real_distribution<float> dis(min, max);
-        return dis(gen);
-    }
-    
-    // Generate random value from Gaussian (normal) distribution
-    // Standard normal when mean=0, stddev=1: N(μ=0, σ=1) with variance σ²=1
-    inline double random_gaussian(double mean, double stddev) {
-        static std::random_device rd;
-        static std::mt19937 gen(rd());
-        std::normal_distribution<double> dis(mean, stddev);
-        return dis(gen);
     }
     
     uint32_t next_prime(uint32_t n) {

@@ -30,7 +30,7 @@ MAIN_SRC = src/main.cpp
 
 INTERFACE_SRC = $(UTILS_DIR)/interface/Interface.cpp $(UTILS_DIR)/interface/print.cpp
 UTILS_SRC = $(UTILS_DIR)/helpers/Utils.cpp
-MATH_SRC = $(UTILS_DIR)/math/math.cpp $(UTILS_DIR)/math/Gaussian.cpp $(UTILS_DIR)/math/Random.cpp
+MATH_SRC = $(UTILS_DIR)/math/math.cpp
 
 SIFT_SRC = $(DATAPROC_DIR)/SIFT/SIFT.cpp
 MNIST_SRC = $(DATAPROC_DIR)/MNIST/MNIST.cpp
