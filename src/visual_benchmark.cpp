@@ -18,6 +18,7 @@
 #include "algorithms/hypercube/Hypercube.h"
 #include "algorithms/IVFFlat/IVFFlat.h"
 #include "algorithms/IVFPQ/IVFPQ.h"
+#include "algorithms/BruteForce/BruteForce.h"
 
 // Include data processing
 #include "dataprocessing/SIFT/SIFT.h"
@@ -25,7 +26,6 @@
 #include "metrics/metrics.h"
 #include "utils/helpers/Utils.h"
 #include "utils/visualization/visualizer.h"
-#include "algorithms/compare/compareAlgo.h"
 
 class VisualBenchmark {
 private:
@@ -136,12 +136,10 @@ public:
             size_t max_queries = std::min(static_cast<size_t>(50), queries.size());
             
             for (size_t i = 0; i < max_queries; ++i) {
-                auto start = std::chrono::high_resolution_clock::now();
+                Utils::AutoTimer timer;
+                timer.start();
                 auto approx_results = lsh.kNearestNeighbour(queries[i], N);
-                auto end = std::chrono::high_resolution_clock::now();
-                
-                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                query_times.push_back(duration.count() / 1000.0); // Convert to milliseconds
+                query_times.push_back(timer.elapsedMs());
                 
                 if (!approx_results.empty()) {
                     auto true_results = computeTrueKNN(queries[i], dataset, N);
@@ -162,8 +160,8 @@ public:
             }
             
             if (!query_times.empty()) {
-                result.mean_query_time = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
-                result.queries_per_second = 1000.0 / result.mean_query_time; // Convert ms to QPS
+                result.mean_query_time_ms = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
+                result.queries_per_second = 1000.0 / result.mean_query_time_ms; // Convert ms to QPS
             }
             
         } catch (const std::exception& e) {
@@ -171,7 +169,7 @@ public:
             result.mean_approximation_factor = 0.0;
             result.recall_at_n = 0.0;
             result.queries_per_second = 0.0;
-            result.mean_query_time = 0.0;
+            result.mean_query_time_ms = 0.0;
         }
         
         return result;
@@ -215,12 +213,10 @@ public:
             size_t max_queries = std::min(static_cast<size_t>(50), queries.size());
             
             for (size_t i = 0; i < max_queries; ++i) {
-                auto start = std::chrono::high_resolution_clock::now();
+                Utils::AutoTimer timer;
+                timer.start();
                 auto approx_results = hypercube.kNearestNeighbour(queries[i], N);
-                auto end = std::chrono::high_resolution_clock::now();
-                
-                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                query_times.push_back(duration.count() / 1000.0); // Convert to milliseconds
+                query_times.push_back(timer.elapsedMs());
                 
                 if (!approx_results.empty()) {
                     auto true_results = computeTrueKNN(queries[i], dataset, N);
@@ -241,8 +237,8 @@ public:
             }
             
             if (!query_times.empty()) {
-                result.mean_query_time = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
-                result.queries_per_second = 1000.0 / result.mean_query_time; // Convert ms to QPS
+                result.mean_query_time_ms = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
+                result.queries_per_second = 1000.0 / result.mean_query_time_ms; // Convert ms to QPS
             }
             
         } catch (const std::exception& e) {
@@ -250,7 +246,7 @@ public:
             result.mean_approximation_factor = 0.0;
             result.recall_at_n = 0.0;
             result.queries_per_second = 0.0;
-            result.mean_query_time = 0.0;
+            result.mean_query_time_ms = 0.0;
         }
         
         return result;
@@ -296,12 +292,10 @@ public:
             size_t max_queries = std::min(static_cast<size_t>(50), queries.size());
             
             for (size_t i = 0; i < max_queries; ++i) {
-                auto start = std::chrono::high_resolution_clock::now();
+                Utils::AutoTimer timer;
+                timer.start();
                 auto approx_results = ivfflat.search_k_nearest(queries[i], N);
-                auto end = std::chrono::high_resolution_clock::now();
-                
-                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                query_times.push_back(duration.count() / 1000.0); // Convert to milliseconds
+                query_times.push_back(timer.elapsedMs());
                 
                 if (!approx_results.empty()) {
                     auto true_results = computeTrueKNN(queries[i], dataset, N);
@@ -322,8 +316,8 @@ public:
             }
             
             if (!query_times.empty()) {
-                result.mean_query_time = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
-                result.queries_per_second = 1000.0 / result.mean_query_time; // Convert ms to QPS
+                result.mean_query_time_ms = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
+                result.queries_per_second = 1000.0 / result.mean_query_time_ms; // Convert ms to QPS
             }
             
         } catch (const std::exception& e) {
@@ -331,7 +325,7 @@ public:
             result.mean_approximation_factor = 0.0;
             result.recall_at_n = 0.0;
             result.queries_per_second = 0.0;
-            result.mean_query_time = 0.0;
+            result.mean_query_time_ms = 0.0;
         }
         
         return result;
@@ -377,12 +371,10 @@ public:
             size_t max_queries = std::min(static_cast<size_t>(50), queries.size());
             
             for (size_t i = 0; i < max_queries; ++i) {
-                auto start = std::chrono::high_resolution_clock::now();
+                Utils::AutoTimer timer;
+                timer.start();
                 auto approx_results = ivfpq.search_k_nearest(queries[i], N);
-                auto end = std::chrono::high_resolution_clock::now();
-                
-                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                query_times.push_back(duration.count() / 1000.0); // Convert to milliseconds
+                query_times.push_back(timer.elapsedMs());
                 
                 if (!approx_results.empty()) {
                     auto true_results = computeTrueKNN(queries[i], dataset, N);
@@ -403,8 +395,8 @@ public:
             }
             
             if (!query_times.empty()) {
-                result.mean_query_time = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
-                result.queries_per_second = 1000.0 / result.mean_query_time; // Convert ms to QPS
+                result.mean_query_time_ms = std::accumulate(query_times.begin(), query_times.end(), 0.0) / query_times.size();
+                result.queries_per_second = 1000.0 / result.mean_query_time_ms; // Convert ms to QPS
             }
             
         } catch (const std::exception& e) {
@@ -412,7 +404,7 @@ public:
             result.mean_approximation_factor = 0.0;
             result.recall_at_n = 0.0;
             result.queries_per_second = 0.0;
-            result.mean_query_time = 0.0;
+            result.mean_query_time_ms = 0.0;
         }
         
         return result;
@@ -627,7 +619,7 @@ public:
             file << std::fixed << std::setprecision(6) << result.mean_approximation_factor << ",";
             file << std::fixed << std::setprecision(6) << result.recall_at_n << ",";
             file << std::fixed << std::setprecision(2) << result.queries_per_second << ",";
-            file << std::fixed << std::setprecision(3) << result.mean_query_time << ",";
+            file << std::fixed << std::setprecision(3) << result.mean_query_time_ms << ",";
             file << result.dataset_size << "," << result.query_count << ",";
             
             // Parameters as JSON-like string

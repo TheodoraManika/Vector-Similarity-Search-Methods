@@ -110,7 +110,7 @@ void ResultsVisualizer<T>::plot_parameter_impact(const std::string& algorithm_na
             } else if (metric_name == "QPS") {
                 data << result.queries_per_second;
             } else if (metric_name == "Time") {
-                data << result.mean_query_time;
+                data << result.mean_query_time_ms;
             }
             data << "\n";
         }
@@ -173,7 +173,7 @@ void ResultsVisualizer<T>::plot_algorithm_comparison_bar(const std::string& metr
         } else if (metric_name == "QPS") {
             metric_value = result.queries_per_second;
         } else if (metric_name == "Time") {
-            metric_value = result.mean_query_time;
+            metric_value = result.mean_query_time_ms;
         }
         
         algorithm_metrics[result.algorithm_name].push_back(metric_value);
@@ -407,7 +407,7 @@ void ResultsVisualizer<T>::create_html_report(const std::string& filename) const
         html << "<td>" << std::fixed << std::setprecision(3) << result.mean_approximation_factor << "</td>\n";
         html << "<td>" << std::fixed << std::setprecision(3) << result.recall_at_n << "</td>\n";
         html << "<td>" << std::fixed << std::setprecision(1) << result.queries_per_second << "</td>\n";
-        html << "<td>" << std::fixed << std::setprecision(2) << result.mean_query_time << "</td>\n";
+        html << "<td>" << std::fixed << std::setprecision(2) << result.mean_query_time_ms << "</td>\n";
         html << "<td>" << result.dataset_size << "</td>\n";
         html << "</tr>\n";
     }

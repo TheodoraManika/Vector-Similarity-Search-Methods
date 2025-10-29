@@ -41,7 +41,6 @@ KMEANS_SRC = $(ALGORITHM_DIR)/Kmeans/kmeans.cpp
 IVFFLAT_SRC = $(ALGORITHM_DIR)/IVFFlat/IVFFlat.cpp
 IVFPQ_SRC = $(ALGORITHM_DIR)/IVFPQ/IVFPQ.cpp
 BRUTEFORCE_SRC = $(ALGORITHM_DIR)/BruteForce/BruteForce.cpp
-COMPARE_SRC = $(ALGORITHM_DIR)/compare/compareAlgo.cpp
 
 METRICS_SRC = $(METRICS_DIR)/metrics.cpp
 VIS_SRC = $(VIS_DIR)/visualizer.cpp
@@ -54,7 +53,7 @@ VISUAL_BENCHMARK_SRC = src/visual_benchmark.cpp
 LIB_SOURCES = $(INTERFACE_SRC) $(UTILS_SRC) $(MATH_SRC) \
               $(SIFT_SRC) $(MNIST_SRC) $(LSH_SRC) $(HYPERCUBE_SRC) \
               $(KMEANS_SRC) $(IVFFLAT_SRC) $(IVFPQ_SRC) $(BRUTEFORCE_SRC) \
-              $(COMPARE_SRC) $(METRICS_SRC) $(VIS_SRC)
+              $(METRICS_SRC) $(VIS_SRC)
 
 # Main program sources
 MAIN_SOURCES = $(MAIN_SRC) $(LIB_SOURCES)
@@ -85,7 +84,7 @@ $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/hypercube)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/Kmeans)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFFlat)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFPQ)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/compare)
+$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/BruteForce)
 $(shell mkdir -p $(OBJ_DIR)/$(METRICS_DIR))
 $(shell mkdir -p $(OBJ_DIR)/$(VIS_DIR))
 $(shell mkdir -p $(OBJ_DIR)/src)
@@ -136,19 +135,12 @@ clean:
 # Clean and rebuild
 rebuild: clean all
 
-# Install target (optional)
-install: $(TARGET)
-	cp $(TARGET) /usr/local/bin/
-
 # Test targets
 test-lsh-sift: $(TARGET)
 	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh_sift.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 4 -R 500.0 -range true
 
 test-lsh-mnist: $(TARGET)
 	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_lsh_mnist.txt -type mnist -lsh -k 4 -L 5 -w 4.0 -N 4 -R 1500.0 -range true
-
-# Alias for backward compatibility
-test-lsh: test-lsh-sift
 
 test-hypercube-sift: $(TARGET)
 	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube_sift.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 4 -R 500.0 -range true 
@@ -177,11 +169,6 @@ visual-benchmark: $(VISUAL_BENCHMARK)
 	@mkdir -p results/visualization
 	./$(VISUAL_BENCHMARK)
 
-# Generate documentation
-docs:
-	@echo "Generating documentation..."
-	doxygen Doxyfile 2>/dev/null || echo "Doxygen not available, skipping documentation generation"
-
 # Help target
 help:
 	@echo "Available targets:"
@@ -194,28 +181,15 @@ help:
 	@echo "  visual-benchmark   - Run comprehensive visual analysis with parameter sweeps"
 	@echo "  test-lsh-sift      - Test LSH algorithm with SIFT dataset"
 	@echo "  test-lsh-mnist     - Test LSH algorithm with MNIST dataset"
-	@echo "  test-lsh           - Test LSH algorithm with SIFT (alias for test-lsh-sift)"
-	@echo "  test-hypercube     - Test Hypercube algorithm"
+	@echo "  test-hypercube-sift     - Test Hypercube algorithm with SIFT dataset"
+	@echo "  test-hypercube-mnist     - Test Hypercube algorithm with MNIST dataset"
 	@echo "  test-ivfflat       - Test IVFFlat algorithm"
 	@echo "  test-ivfpq         - Test IVFPQ algorithm"
-	@echo "  docs               - Generate documentation"
 	@echo "  install            - Install to /usr/local/bin"
-	@echo ""
-	@echo "NEW: visual-benchmark provides comprehensive analysis with:"
-	@echo "  - Parameter sweep testing for all algorithms"
-	@echo "  - Automatic plot generation (bar charts, trade-off analysis)"
-	@echo "  - Parameter impact analysis"
-	@echo "  - Interactive HTML report with embedded visualizations"
-	@echo "  - Results saved to results/visualization/ directory"
-	@echo ""
-	@echo "Note: Makefile uses incremental compilation - only changed files are recompiled"
-	@echo "Use 'rebuild' to force full recompilation if needed"
+	
 # Phony targets
 .PHONY: all all-tests debug clean rebuild install comprehensive-benchmark visual-benchmark docs help
 .PHONY: test-lsh test-lsh-sift test-lsh-mnist test-hypercube test-ivfflat test-ivfpq
-
-# Note: This Makefile uses automatic dependency generation for incremental compilation
-# Only changed source files and their dependencies will be recompiled
 
 # Dependencies (basic)
 $(OBJ_DIR)/main.o: main.cpp $(UTILS_DIR)/interface/Interface.h

@@ -7,7 +7,29 @@
 #include <iostream>
 #include <algorithm>
 #include <cmath>
-#include "../../algorithms/compare/compareAlgo.h"
+
+// Forward declaration of BenchmarkResult structure
+template <typename T>
+struct BenchmarkResult {
+    std::string algorithm_name;
+    std::string dataset_name;
+    std::map<std::string, std::string> parameters;
+    
+    double mean_approximation_factor;
+    double recall_at_n;
+    double queries_per_second;
+    double mean_query_time_ms;
+    double brute_force_time_ms;
+    double speedup_vs_brute_force;
+    
+    size_t dataset_size;
+    size_t query_count;
+    
+    BenchmarkResult() : mean_approximation_factor(0), recall_at_n(0),
+                       queries_per_second(0), mean_query_time_ms(0),
+                       brute_force_time_ms(0), speedup_vs_brute_force(0),
+                       dataset_size(0), query_count(0) {}
+};
 
 template <typename T>
 class ResultsVisualizer {

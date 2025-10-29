@@ -16,6 +16,7 @@
 #include "algorithms/hypercube/Hypercube.h"
 #include "algorithms/IVFFlat/IVFFlat.h"
 #include "algorithms/IVFPQ/IVFPQ.h"
+#include "algorithms/BruteForce/BruteForce.h"
 
 // Include data processing
 #include "dataprocessing/SIFT/SIFT.h"
@@ -34,6 +35,8 @@ struct BenchmarkResult {
     double recall_at_n;               // ανάκληση στους Ν πλησιέστερους γείτονες
     double queries_per_second;        // πλήθος αναζητήσεων ανά δευτερόλεπτο
     double mean_query_time_ms;        // μέσος χρόνος ερωτήματος
+    double brute_force_time_ms;       // μέσος χρόνος brute force
+    double speedup_vs_brute_force;    // ταχύτητα σε σχέση με brute force
     
     size_t dataset_size;
     size_t query_count;
@@ -42,6 +45,7 @@ struct BenchmarkResult {
     
     BenchmarkResult() : mean_approximation_factor(0), recall_at_n(0), 
                        queries_per_second(0), mean_query_time_ms(0),
+                       brute_force_time_ms(0), speedup_vs_brute_force(0),
                        dataset_size(0), query_count(0), k_neighbors(0), range_radius(0) {}
 };
 
@@ -160,12 +164,10 @@ public:
                 auto true_results = computeTrueKNN(queries[i], dataset, N);
                 
                 // Measure query time
-                auto start = std::chrono::high_resolution_clock::now();
+                Utils::AutoTimer timer;
+                timer.start();
                 auto approx_results = lsh.kNearestNeighbour(queries[i], N);
-                auto end = std::chrono::high_resolution_clock::now();
-                
-                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                query_times.push_back(duration.count() / 1000.0);  // Convert to milliseconds
+                query_times.push_back(timer.elapsedMs());
                 
                 if (!approx_results.empty() && !true_results.empty()) {
                     total_af += computeApproximationFactor(approx_results, true_results);
@@ -235,12 +237,10 @@ public:
                 auto true_results = computeTrueKNN(queries[i], dataset, N);
                 
                 // Measure query time
-                auto start = std::chrono::high_resolution_clock::now();
+                Utils::AutoTimer timer;
+                timer.start();
                 auto approx_results = hypercube.kNearestNeighbour(queries[i], N);
-                auto end = std::chrono::high_resolution_clock::now();
-                
-                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                query_times.push_back(duration.count() / 1000.0);
+                query_times.push_back(timer.elapsedMs());
                 
                 if (!approx_results.empty() && !true_results.empty()) {
                     total_af += computeApproximationFactor(approx_results, true_results);
@@ -309,12 +309,10 @@ public:
                     auto true_results = computeTrueKNN(queries[i], dataset, N);
                     
                     // Measure query time
-                    auto start = std::chrono::high_resolution_clock::now();
+                    Utils::AutoTimer timer;
+                    timer.start();
                     auto approx_results = ivfflat.search_k_nearest(queries[i], N);
-                    auto end = std::chrono::high_resolution_clock::now();
-                    
-                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                    query_times.push_back(duration.count() / 1000.0);
+                    query_times.push_back(timer.elapsedMs());
                     
                     if (!approx_results.empty() && !true_results.empty()) {
                         total_af += computeApproximationFactor(approx_results, true_results);
@@ -390,12 +388,10 @@ public:
                     auto true_results = computeTrueKNN(queries[i], dataset, N);
                     
                     // Measure query time
-                    auto start = std::chrono::high_resolution_clock::now();
+                    Utils::AutoTimer timer;
+                    timer.start();
                     auto approx_results = ivfpq.search_k_nearest(queries[i], N);
-                    auto end = std::chrono::high_resolution_clock::now();
-                    
-                    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-                    query_times.push_back(duration.count() / 1000.0);
+                    query_times.push_back(timer.elapsedMs());
                     
                     if (!approx_results.empty() && !true_results.empty()) {
                         total_af += computeApproximationFactor(approx_results, true_results);
