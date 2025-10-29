@@ -40,6 +40,7 @@ HYPERCUBE_SRC = $(ALGORITHM_DIR)/hypercube/Hypercube.cpp
 KMEANS_SRC = $(ALGORITHM_DIR)/Kmeans/kmeans.cpp
 IVFFLAT_SRC = $(ALGORITHM_DIR)/IVFFlat/IVFFlat.cpp
 IVFPQ_SRC = $(ALGORITHM_DIR)/IVFPQ/IVFPQ.cpp
+BRUTEFORCE_SRC = $(ALGORITHM_DIR)/BruteForce/BruteForce.cpp
 COMPARE_SRC = $(ALGORITHM_DIR)/compare/compareAlgo.cpp
 
 METRICS_SRC = $(METRICS_DIR)/metrics.cpp
@@ -52,8 +53,8 @@ VISUAL_BENCHMARK_SRC = src/visual_benchmark.cpp
 # Common library sources (excluding main files)
 LIB_SOURCES = $(INTERFACE_SRC) $(UTILS_SRC) $(MATH_SRC) \
               $(SIFT_SRC) $(MNIST_SRC) $(LSH_SRC) $(HYPERCUBE_SRC) \
-              $(KMEANS_SRC) $(IVFFLAT_SRC) $(IVFPQ_SRC) $(COMPARE_SRC) \
-              $(METRICS_SRC) $(VIS_SRC)
+              $(KMEANS_SRC) $(IVFFLAT_SRC) $(IVFPQ_SRC) $(BRUTEFORCE_SRC) \
+              $(COMPARE_SRC) $(METRICS_SRC) $(VIS_SRC)
 
 # Main program sources
 MAIN_SOURCES = $(MAIN_SRC) $(LIB_SOURCES)

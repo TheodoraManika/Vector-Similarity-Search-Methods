@@ -5,6 +5,7 @@
 #include <utility>
 #include <climits>
 #include <algorithm>
+#include <cstdint>
 #include "../../metrics/metrics.h"
 
 /**
