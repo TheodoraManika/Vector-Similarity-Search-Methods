@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <iomanip>
 #include <sstream>
+#include <iostream>
 #include <cmath>
 
 namespace Utils {
@@ -116,5 +117,33 @@ namespace Utils {
             return ((value & 0xFF00) >> 8) |
                    ((value & 0x00FF) << 8);
         }
+    }
+    
+    // AutoTimer implementation
+    AutoTimer::AutoTimer(const std::string& timer_name, bool print)
+        : name(timer_name), print_on_destroy(print) {
+        start();
+    }
+    
+    AutoTimer::~AutoTimer() {
+        if (print_on_destroy && !name.empty()) {
+            std::cout << name << " took " << elapsed() << " seconds" << std::endl;
+        }
+    }
+    
+    void AutoTimer::start() {
+        start_time = std::chrono::high_resolution_clock::now();
+    }
+    
+    double AutoTimer::elapsed() const {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return duration.count() / 1000000.0;
+    }
+    
+    double AutoTimer::elapsedMs() const {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+        return duration.count() / 1000.0;
     }
 }

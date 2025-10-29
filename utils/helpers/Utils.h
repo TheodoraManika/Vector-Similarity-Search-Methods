@@ -44,4 +44,22 @@ namespace Utils {
         uint32_t bigToLittleEndian(uint32_t value);
         uint16_t bigToLittleEndian(uint16_t value);
     }
+    
+    /**
+     * Timer utility for measuring execution time
+     */
+    class AutoTimer {
+    private:
+        std::chrono::high_resolution_clock::time_point start_time;
+        std::string name;
+        bool print_on_destroy;
+        
+    public:
+        AutoTimer(const std::string& timer_name = "", bool print = false);
+        ~AutoTimer();
+        
+        void start();
+        double elapsed() const;  // Returns elapsed time in seconds
+        double elapsedMs() const;  // Returns elapsed time in milliseconds
+    };
 }
