@@ -120,7 +120,7 @@ std::list<std::pair<int,T>> Hypercube<T>::kNearestNeighbour(std::vector<T> query
                 
                 if (points_checked >= M) break;
                 
-                T distance = metrics::EuclideanDistance(query_vector, feature_vectors[point_idx], query_vector.size());
+                T distance = metrics::ManhattanDistance(query_vector, feature_vectors[point_idx], query_vector.size());
                 
                 if (pq.size() < static_cast<size_t>(k)) {
                     pq.emplace(distance, point_idx);
@@ -183,7 +183,7 @@ std::list<std::pair<int,T>> Hypercube<T>::RangeSearch(std::vector<T> query_vecto
                 
                 if (points_checked >= M) break;
                 
-                T distance = metrics::EuclideanDistance(query_vector, feature_vectors[point_idx], query_vector.size());
+                T distance = metrics::ManhattanDistance(query_vector, feature_vectors[point_idx], query_vector.size());
                 
                 if (distance <= radius) {
                     result.emplace_back(point_idx, distance);
