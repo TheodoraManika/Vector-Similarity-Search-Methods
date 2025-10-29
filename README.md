@@ -18,8 +18,10 @@
 ## Κατάλογος Αρχείων
 
 ### Κύρια Αρχεία
-- `main.cpp` - Κύριο σημείο εισόδου του προγράμματος
-- `Makefile` - Αρχείο μεταγλώττισης
+- `src/main.cpp` - Κύριο σημείο εισόδου του προγράμματος (CLI search)
+- `src/comprehensive_benchmark.cpp` - Εκτελέσιμο για πειραματική μελέτη (AF, Recall@N, QPS)
+- `src/visual_benchmark.cpp` - Εκτελέσιμο για visual αναλύσεις και αναφορές
+- `Makefile` - Αρχείο μεταγλώττισης με πολλαπλούς στόχους (search, benchmarks, tests)
 - `README.md` - Αυτό το αρχείο τεκμηρίωσης
 
 ### Αλγόριθμοι (`algorithms/`)
@@ -28,29 +30,39 @@
 - `Kmeans/kmeans.h`, `Kmeans/kmeans.cpp` - Υλοποίηση K-means clustering
 - `IVFFlat/IVFFlat.h`, `IVFFlat/IVFFlat.cpp` - Υλοποίηση IVFFlat
 - `IVFPQ/IVFPQ.h`, `IVFPQ/IVFPQ.cpp` - Υλοποίηση IVFPQ
+- `BruteForce/BruteForce.h`, `BruteForce/BruteForce.cpp` - Ακριβής (ground-truth) αναζήτηση για σύγκριση
 
 ### Επεξεργασία Δεδομένων (`dataprocessing/`)
 - `SIFT/SIFT.h`, `SIFT/SIFT.cpp` - Parser για δεδομένα SIFT
-- `MNIST/MNIST.h`, `MNIST/MNIST_impl.cpp` - Parser για δεδομένα MNIST
+- `MNIST/MNIST.h`, `MNIST/MNIST.cpp` - Parser για δεδομένα MNIST
 
 ### Βοηθητικά Εργαλεία (`utils/`)
-- `interface/Interface.h`, `interface/Interface.cpp` - Κύρια διεπαφή προγράμματος
-- `helpers/Utils.h`, `helpers/Utils.cpp` - Βοηθητικές συναρτήσεις
-- `math/math.h`, `math/math.cpp` - Μαθηματικές λειτουργίες
-- `helpers/Utils.h` - Utility functions for statistics and file operations
-- `math/math.h` - Mathematical functions and hash computations
-- `math/Random.h` - Random number generation utilities  
-- `math/Gaussian.h` - Gaussian distribution functions
-- `interface/print.h` - Print functions for debugging
+- `interface/Interface.h`, `interface/Interface.cpp` - Κύρια διεπαφή προγράμματος (parsing, εκτέλεση αναζητήσεων)
+- `helpers/Utils.h`, `helpers/Utils.cpp` - Βοηθητικές συναρτήσεις (FileUtils, Stats, Convert) και AutoTimer για μετρήσεις χρόνου
+- `math/math.h`, `math/math.cpp` - Μαθηματικές λειτουργίες και υπολογισμοί
+- `visualization/visualizer.h`, `visualization/visualizer.cpp` - Δημιουργία plots και HTML αναφορών από αποτελέσματα
 
 ### Μετρικές (`metrics/`)
 - `metrics.h`, `metrics.cpp` - Υλοποίηση μετρικών απόστασης
+
+## Δομή Project (σύνοψη)
+
+```
+Algorithms/
+    LSH/ IVFFlat/ IVFPQ/ Hypercube/ Kmeans/ BruteForce/
+Dataprocessing/
+    MNIST/ SIFT/
+utils/
+    interface/ helpers/ math/ visualization/
+metrics/
+src/
+    main.cpp comprehensive_benchmark.cpp visual_benchmark.cpp
+```
 
 ## Οδηγίες Μεταγλώττισης
 
 ### Προαπαιτούμενα
 - Compiler C++17 ή νεότερος (g++ 7+ ή clang++ 5+)
-- GNU Make
 
 ### Μεταγλώττιση
 ```bash
@@ -65,6 +77,9 @@ make clean
 
 # Rebuild από την αρχή
 make rebuild
+
+# Μεταγλώττιση όλων των εκτελέσιμων (search + benchmarks)
+make all-tests
 ```
 
 ## Οδηγίες Χρήσης
@@ -129,17 +144,41 @@ make rebuild
 
 ```bash
 # LSH με SIFT δεδομένα
-./search -d sift_base.fvecs -q sift_query.fvecs -o output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
+./search -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
 
 # Hypercube με MNIST δεδομένα
-./search -d mnist_input.dat -q mnist_query.dat -o output_hypercube.txt -type mnist -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 5 -R 2000 -range true
+./search -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_hypercube.txt -type mnist -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 5 -R 2000 -range true
 
 # IVFFlat με optimized clusters
-./search -d input.dat -q query.dat -o output_ivfflat.txt -type sift -ivfflat -kclusters 100 -nprobe 10 -N 10 -R 2.0 -seed 42
+./search -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat.txt -type sift -ivfflat -kclusters 100 -nprobe 10 -N 10 -R 2.0 -seed 42
 
 # IVFPQ με υψηλή συμπίεση
-./search -d input.dat -q query.dat -o output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
+./search -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
 ```
+
+## Benchmarks και Οπτικοποίηση
+
+Υπάρχουν δύο επιπλέον εκτελέσιμα για μελέτες απόδοσης:
+
+- `comprehensive_benchmark` — Τρέχει συγκριτικές δοκιμές (AF, Recall@N, QPS) και χρησιμοποιεί BruteForce για ground-truth και υπολογισμό ταχύτητας/σύγκρισης.
+- `visual_benchmark` — Δημιουργεί CSV, plots και HTML report (στο `results/visualization/`).
+
+Στόχοι Makefile:
+
+```bash
+# Μεταγλώττιση όλων των εκτελέσιμων
+make all-tests
+
+# Εκτέλεση comprehensive benchmark
+make comprehensive-benchmark
+
+# Εκτέλεση visual benchmark και παραγωγή αναφορών
+make visual-benchmark
+```
+
+Σημειώσεις:
+- Οι μετρήσεις χρόνου υλοποιούνται με `Utils::AutoTimer` σε όλα τα benchmarks και στο interface.
+- Το `BruteForce` χρησιμοποιείται για υπολογισμό ακριβών KNN και για σύγκριση χρόνου (speedup vs brute force).
 
 ## Μορφή Εξόδου
 
@@ -209,21 +248,23 @@ QPS: <queries_per_second>
 - **tApproximateAverage**: Μέσος χρόνος προσεγγιστικής αναζήτησης
 - **tTrueAverage**: Μέσος χρόνος ακριβούς αναζήτησης
 
+Στα εκτελέσιμα των benchmarks, επιπλέον παράγονται:
+- **MeanQueryTimeMS**: Μέσος χρόνος ερωτήματος (ms)
+- **BruteForceTimeMS**: Μέσος χρόνος brute force (ms)
+- **SpeedupVsBruteForce**: Λόγος επιτάχυνσης έναντι brute force
+
 ## Στοιχεία Ανάπτυξης
 
 **Φοιτητές:**
-- [Όνομα Φοιτητή 1] - [ΑΜ] - [email]
-- [Όνομα Φοιτητή 2] - [ΑΜ] - [email]
+- Τσάκωνα Μυρτώ - [ΑΜ] - [email]
+- Μανίκα Θεοδώρα - [1115202100267] - [sdi2100267@di.uoa.gr]
 
 **Ακαδημαϊκό Έτος:** 2025-2026
 
 **Μάθημα:** Ανάπτυξη Λογισμικού για Αλγοριθμικά Προβλήματα
 
-**Ίδρυμα:** [Πανεπιστήμιο]
+**Ίδρυμα:** ΕΚΠΑ
 
 ## Άδεια Χρήσης
 
 Αυτό το έργο αναπτύχθηκε για εκπαιδευτικούς σκοπούς ως μέρος πανεπιστημιακής εργασίας.
-
-
-https://github.com/nikosgalanis/Vectors-Similarity-Search-and-Clustering/blob/main/results/cluster_lloyds_1000_queries

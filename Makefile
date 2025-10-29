@@ -28,7 +28,7 @@ VISUAL_BENCHMARK = visual_benchmark
 # Source files
 MAIN_SRC = src/main.cpp
 
-INTERFACE_SRC = $(UTILS_DIR)/interface/Interface.cpp $(UTILS_DIR)/interface/print.cpp
+INTERFACE_SRC = $(UTILS_DIR)/interface/Interface.cpp
 UTILS_SRC = $(UTILS_DIR)/helpers/Utils.cpp
 MATH_SRC = $(UTILS_DIR)/math/math.cpp
 
