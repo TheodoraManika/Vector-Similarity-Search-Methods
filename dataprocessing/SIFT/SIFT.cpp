@@ -44,9 +44,6 @@ namespace SIFT {
             throw std::runtime_error("No SIFT vectors found in file: " + filename);
         }
         
-        std::cout << "Loaded " << dataset.size() << " SIFT vectors of dimension " 
-                  << dataset[0].size() << " from " << filename << std::endl;
-        
         return dataset;
     }
 }

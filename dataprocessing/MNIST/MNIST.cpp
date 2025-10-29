@@ -77,9 +77,6 @@ namespace MNIST {
             dataset.push_back(std::move(image));
         }
         
-        std::cout << "Loaded " << dataset.size() << " MNIST images of dimension " 
-                  << dataset[0].size() << " from " << filename << std::endl;
-        
         return dataset;
     }
 }
