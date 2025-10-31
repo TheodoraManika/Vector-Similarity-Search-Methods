@@ -54,25 +54,19 @@ public:
                     int kclusters, int nprobe, int M, int nbits, int N, double R, bool range, int seed);
     
     // Output functions following exact assignment format
-    void printSearchResults(std::ofstream& output, const std::string& method_name,
-                           int query_id, const std::list<std::pair<int, float>>& neighbors,
-                           const std::list<std::pair<int, float>>& true_neighbors,
-                           const std::list<int>& range_results);
+    void printSearchResults(std::ofstream& output,
+                                   [[maybe_unused]] const std::string& method_name,
+                                   int query_id,
+                                   const std::list<std::pair<int, float>>& neighbors,
+                                   const std::list<std::pair<int, float>>& true_neighbors,
+                                   const std::list<int>& range_results,
+                                   int N);
     
     void printFinalStatistics(std::ofstream& output, double avg_af, double recall_at_n,
-                             double qps, double t_approx_avg, double t_true_avg);
+                                     double qps, double t_approx_avg, double t_true_avg);
     
     // Utility functions
-    void printUsage();
     bool fileExists(const std::string& filename);
-    
-private:
-    // Helper functions
-    double calculateAF(float approx_dist, float true_dist);
-    double calculateRecallAtN(const std::vector<std::list<std::pair<int, float>>>& approx_results,
-                             const std::vector<std::list<std::pair<int, float>>>& true_results, int N);
-    double calculateQPS(int num_queries, double total_time);
-    std::string getCurrentTimestamp();
 };
 
 // Global utility functions for data parsing

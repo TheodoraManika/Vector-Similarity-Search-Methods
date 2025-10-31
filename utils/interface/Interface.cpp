@@ -60,7 +60,6 @@ int Interface::runSearch(int argc, char* argv[]) {
         }
         else {
             std::cerr << "Error: Unknown method. Use -lsh, -hypercube, -ivfflat, or -ivfpq" << std::endl;
-            printUsage();
             return 1;
         }
     }
@@ -220,8 +219,6 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
         const auto& query = queries[query_idx];
         
-        output << "Query: " << query_idx << std::endl;
-        
         // Approximate search using LSH
         Utils::AutoTimer approx_timer;
         approx_timer.start();
@@ -288,44 +285,17 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         total_recall += query_recall;
         valid_queries++;
         
-        // Output neighbors
-        auto approx_it = neighbors.begin();
-        auto true_it = true_neighbors.begin();
-        
-        for (int i = 1; i <= N; ++i) {
-            if (approx_it != neighbors.end() && true_it != true_neighbors.end()) {
-                int approx_neighbor_id = approx_it->first;
-                float approx_distance = approx_it->second;
-                float true_distance = true_it->second;
-                
-                // Output the APPROXIMATE neighbor ID (what LSH found)
-                output << "Nearest neighbor-" << i << ": " << approx_neighbor_id << std::endl;
-                
-                // distanceApproximate: distance from query to the approximate neighbor
-                output << "distanceApproximate: " << std::fixed << std::setprecision(6) 
-                       << approx_distance << std::endl;
-                
-                // distanceTrue: distance from query to the TRUE nearest neighbor
-                output << "distanceTrue: " << std::fixed << std::setprecision(6) 
-                       << true_distance << std::endl;
-                
-                ++approx_it;
-                ++true_it;
-            } else {
-                output << "Nearest neighbor-" << i << ": NONE" << std::endl;
-                output << "distanceApproximate: " << std::numeric_limits<float>::max() << std::endl;
-                output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
-            }
-        }
-        
         // Range search if requested
+        std::list<int> range_result_ids;
         if (range) {
             auto range_results = lsh.RangeSearch(query, R, 1);
-            output << "R-near neighbors:" << std::endl;
             for (const auto& result : range_results) {
-                output << result.first << std::endl;
+                range_result_ids.push_back(result.first);
             }
         }
+        
+        // Use helper function to print results
+        printSearchResults(output, "LSH", query_idx, neighbors, true_neighbors, range_result_ids, N);
     }
     
     double total_time_seconds = total_timer.elapsed();
@@ -337,12 +307,8 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     double avg_true_time = total_true_time / queries.size();
     double qps = total_time_seconds > 0 ? queries.size() / total_time_seconds : 0.0;
     
-    // Output final statistics according to specification
-    output << "Average AF: " << std::fixed << std::setprecision(6) << avg_af << std::endl;
-    output << "Recall@" << N << ": " << std::fixed << std::setprecision(6) << recall_at_n << std::endl;
-    output << "QPS: " << std::fixed << std::setprecision(2) << qps << std::endl;
-    output << "tApproximateAverage: " << std::fixed << std::setprecision(6) << avg_approx_time << std::endl;
-    output << "tTrueAverage: " << std::fixed << std::setprecision(6) << avg_true_time << std::endl;
+    // Use helper function to print final statistics
+    printFinalStatistics(output, avg_af, recall_at_n, qps, avg_approx_time, avg_true_time);
     
     output.close();
     std::cout << "LSH search completed successfully" << std::endl;
@@ -402,8 +368,6 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     // Process queries (limit for testing)
     size_t max_queries = queries.size(); // Process all queries
     for (size_t query_idx = 0; query_idx < max_queries; ++query_idx) {
-        output << "Query: " << query_idx << std::endl;
-        
         try {
             // Approximate search using Hypercube
             Utils::AutoTimer approx_timer;
@@ -427,31 +391,10 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
                              all_distances.end());
             total_true_time += true_timer.elapsed();
             
-            // Output neighbors according to PDF format
-            auto neighbor_it = neighbors.begin();
-            int neighbor_count = 1;
-            
-            for (int i = 0; i < N; ++i) {
-                output << "Nearest neighbor-" << neighbor_count << ": ";
-                
-                if (neighbor_it != neighbors.end()) {
-                    output << neighbor_it->first << std::endl;
-                    output << "distanceApproximate: " << std::fixed << std::setprecision(6) 
-                           << neighbor_it->second << std::endl;
-                    ++neighbor_it;
-                } else {
-                    output << "NONE" << std::endl;
-                    output << "distanceApproximate: " << std::numeric_limits<float>::max() << std::endl;
-                }
-                
-                if (i < static_cast<int>(all_distances.size())) {
-                    output << "distanceTrue: " << std::fixed << std::setprecision(6) 
-                           << all_distances[i].first << std::endl;
-                } else {
-                    output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
-                }
-                
-                neighbor_count++;
+            // Build true_neighbors list in the format needed by printSearchResults
+            std::list<std::pair<int, float>> true_neighbors;
+            for (int i = 0; i < N && i < static_cast<int>(all_distances.size()); ++i) {
+                true_neighbors.emplace_back(all_distances[i].second, all_distances[i].first);
             }
             
             // Calculate approximation factor for this query
@@ -464,13 +407,16 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
             }
             
             // Range search if requested
+            std::list<int> range_result_ids;
             if (range) {
                 auto range_results = hypercube.RangeSearch(queries[query_idx], R);
-                output << "R-near neighbors:" << std::endl;
                 for (const auto& neighbor : range_results) {
-                    output << neighbor.first << std::endl;
+                    range_result_ids.push_back(neighbor.first);
                 }
             }
+            
+            // Use helper function to print results
+            printSearchResults(output, "Hypercube", query_idx, neighbors, true_neighbors, range_result_ids, N);
             
         } catch (const std::exception& e) {
             std::cerr << "Error processing query " << query_idx << ": " << e.what() << std::endl;
@@ -520,7 +466,7 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
         std::list<std::pair<int, float>> true_neighbors;
         std::list<int> range_results;
         
-        printSearchResults(output, "IVFFlat", query_idx, neighbors, true_neighbors, range_results);
+        printSearchResults(output, "IVFFlat", query_idx, neighbors, true_neighbors, range_results, N);
     }
     
     printFinalStatistics(output, 1.20, 0.70, 60.0, 0.003, 0.010);
@@ -554,7 +500,7 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
         std::list<std::pair<int, float>> true_neighbors;
         std::list<int> range_results;
         
-        printSearchResults(output, "IVFPQ", query_idx, neighbors, true_neighbors, range_results);
+        printSearchResults(output, "IVFPQ", query_idx, neighbors, true_neighbors, range_results, N);
     }
     
     printFinalStatistics(output, 1.25, 0.65, 50.0, 0.004, 0.010);
@@ -563,37 +509,43 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
     return 0;
 }
 
-void Interface::printSearchResults(std::ofstream& output, [[maybe_unused]] const std::string& method_name,
-                                  int query_id, const std::list<std::pair<int, float>>& neighbors,
-                                  const std::list<std::pair<int, float>>& true_neighbors,
-                                  const std::list<int>& range_results) {
-    
+void Interface::printSearchResults(std::ofstream& output,
+                                   [[maybe_unused]] const std::string& method_name,
+                                   int query_id,
+                                   const std::list<std::pair<int, float>>& neighbors,
+                                   const std::list<std::pair<int, float>>& true_neighbors,
+                                   const std::list<int>& range_results,
+                                   int N) {
     output << "Query: " << query_id << std::endl;
-    
-    // Print nearest neighbors according to PDF specification
+
+    // iterate exactly N slots, printing NONE + max float when missing
+    auto approx_it = neighbors.begin();
     auto true_it = true_neighbors.begin();
-    int neighbor_count = 1;
-    
-    for (const auto& neighbor : neighbors) {
-        output << "Nearest neighbor-" << neighbor_count << ": " << neighbor.first << std::endl;
-        output << "distanceApproximate: " << std::fixed << std::setprecision(6) << neighbor.second << std::endl;
-        
+
+    for (int i = 1; i <= N; ++i) {
+        if (approx_it != neighbors.end()) {
+            output << "Nearest neighbor-" << i << ": " << approx_it->first << std::endl;
+            output << "distanceApproximate: " << std::fixed << std::setprecision(6)
+                   << approx_it->second << std::endl;
+            ++approx_it;
+        } else {
+            output << "Nearest neighbor-" << i << ": NONE" << std::endl;
+            output << "distanceApproximate: " << std::numeric_limits<float>::max() << std::endl;
+        }
+
         if (true_it != true_neighbors.end()) {
-            output << "distanceTrue: " << std::fixed << std::setprecision(6) << true_it->second << std::endl;
+            output << "distanceTrue: " << std::fixed << std::setprecision(6)
+                   << true_it->second << std::endl;
             ++true_it;
         } else {
-            // Fallback if true neighbor not available
-            output << "distanceTrue: " << std::fixed << std::setprecision(6) << neighbor.second * 0.95f << std::endl;
+            output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
         }
-        
-        neighbor_count++;
     }
-    
-    // Print range results if they exist (according to PDF specification)
+
+    output << "R-near neighbors:" << std::endl;
     if (!range_results.empty()) {
-        output << "R-near neighbors:" << std::endl;
-        for (int result : range_results) {
-            output << result << std::endl;
+        for (int id : range_results) {
+            output << id << std::endl;
         }
     }
 }
@@ -608,53 +560,10 @@ void Interface::printFinalStatistics(std::ofstream& output, double avg_af, doubl
     output << "tTrueAverage: " << std::fixed << std::setprecision(6) << t_true_avg << std::endl;
 }
 
-void Interface::printUsage() {
-    std::cout << "Usage: ./search [OPTIONS]" << std::endl;
-    std::cout << "\nLSH:" << std::endl;
-    std::cout << "./search -d <input file> -q <query file> -k <int> -L <int> -w <double>" << std::endl;
-    std::cout << "         -o <output file> -N <number of nearest> -R <radius> -type <flag>" << std::endl;
-    std::cout << "         -lsh -range <true|false>" << std::endl;
-    
-    std::cout << "\nHypercube:" << std::endl;
-    std::cout << "./search -d <input file> -q <query file> -kproj <int> -w <double> -M <int>" << std::endl;
-    std::cout << "         -probes <int> -o <output file> -N <number of nearest> -R <radius>" << std::endl;
-    std::cout << "         -type <flag> -range <true|false> -hypercube -seed <int>" << std::endl;
-    
-    std::cout << "\nIVFFlat:" << std::endl;
-    std::cout << "./search -d <input file> -q <query file> -kclusters <int> -nprobe <int>" << std::endl;
-    std::cout << "         -o <output file> -N <number of nearest> -R <radius> -type <flag>" << std::endl;
-    std::cout << "         -range <true|false> -ivfflat -seed <int>" << std::endl;
-    
-    std::cout << "\nIVFPQ:" << std::endl;
-    std::cout << "./search -d <input file> -q <query file> -kclusters <int> -nprobe <int> -M <int>" << std::endl;
-    std::cout << "         -o <output file> -N <number of nearest> -R <radius> -type <flag>" << std::endl;
-    std::cout << "         -nbits <int> -range <true|false> -ivfpq -seed <int>" << std::endl;
-    
-    std::cout << "\nParameters:" << std::endl;
-    std::cout << "  -type: 'sift' or 'mnist'" << std::endl;
-    std::cout << "  -range: 'true' or 'false'" << std::endl;
-}
-
 bool Interface::fileExists(const std::string& filename) {
     return Utils::FileUtils::fileExists(filename);
 }
 
-double Interface::calculateAF(float approx_dist, float true_dist) {
-    return Utils::Stats::calculateAF(approx_dist, true_dist);
-}
-
-double Interface::calculateRecallAtN(const std::vector<std::list<std::pair<int, float>>>& approx_results,
-                                     const std::vector<std::list<std::pair<int, float>>>& true_results, int N) {
-    return Utils::Stats::calculateRecallAtN(approx_results, true_results, N);
-}
-
-double Interface::calculateQPS(int num_queries, double total_time) {
-    return Utils::Stats::calculateQPS(num_queries, total_time);
-}
-
-std::string Interface::getCurrentTimestamp() {
-    return Utils::FileUtils::getCurrentTimestamp();
-}
 
 // DataParser namespace implementation
 namespace DataParser {

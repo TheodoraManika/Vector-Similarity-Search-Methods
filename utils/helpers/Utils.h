@@ -22,21 +22,6 @@ namespace Utils {
     }
     
     /**
-     * Statistical calculation utilities
-     */
-    namespace Stats {
-        // Calculate approximation factor
-        double calculateAF(float approx_dist, float true_dist);
-        
-        // Calculate Recall@N
-        double calculateRecallAtN(const std::vector<std::list<std::pair<int, float>>>& approx_results,
-                                 const std::vector<std::list<std::pair<int, float>>>& true_results, int N);
-        
-        // Calculate queries per second
-        double calculateQPS(int num_queries, double total_time);
-    }
-    
-    /**
      * Data conversion utilities
      */
     namespace Convert {

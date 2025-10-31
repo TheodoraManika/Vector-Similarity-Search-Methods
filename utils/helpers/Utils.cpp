@@ -49,60 +49,6 @@ namespace Utils {
         }
     }
     
-    // Statistics utilities implementation
-    namespace Stats {
-        
-        double calculateAF(float approx_dist, float true_dist) {
-            if (true_dist == 0.0f) return 1.0;
-            return static_cast<double>(approx_dist) / static_cast<double>(true_dist);
-        }
-        
-        double calculateRecallAtN(
-            const std::vector<std::list<std::pair<int, float>>>& approx_results,
-            const std::vector<std::list<std::pair<int, float>>>& true_results,
-            int N
-        ) {
-            size_t num_queries = approx_results.size();
-            if (num_queries == 0 || num_queries != true_results.size()) {
-                return 0.0;
-            }
-            
-            double total_recall = 0.0;
-            size_t n = static_cast<size_t>(N);
-            
-            for (size_t q = 0; q < num_queries; ++q) {
-                size_t matches = 0;
-                size_t check_size = std::min(n, approx_results[q].size());
-                size_t true_size = std::min(n, true_results[q].size());
-                
-                // Convert list to vector for easier iteration
-                std::vector<std::pair<int, float>> approx_vec(approx_results[q].begin(), approx_results[q].end());
-                std::vector<std::pair<int, float>> true_vec(true_results[q].begin(), true_results[q].end());
-                
-                for (size_t i = 0; i < check_size; ++i) {
-                    int approx_id = approx_vec[i].first;
-                    for (size_t j = 0; j < true_size; ++j) {
-                        if (approx_id == true_vec[j].first) {
-                            matches++;
-                            break;
-                        }
-                    }
-                }
-                
-                if (true_size > 0) {
-                    total_recall += static_cast<double>(matches) / static_cast<double>(true_size);
-                }
-            }
-            
-            return total_recall / static_cast<double>(num_queries);
-        }
-        
-        double calculateQPS(int num_queries, double total_time) {
-            if (total_time <= 0.0) return 0.0;
-            return static_cast<double>(num_queries) / total_time;
-        }
-    }
-    
     // Conversion utilities implementation
     namespace Convert {
         
