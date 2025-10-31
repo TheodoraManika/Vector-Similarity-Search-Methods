@@ -28,12 +28,13 @@ int Interface::runSearch(int argc, char* argv[]) {
     std::string input_file, query_file, output_file, type, method;
     int k = 4, L = 5, kproj = 14, kclusters = 10, nprobe = 1;
     int M = 10, probes = 2, nbits = 8, N = 1, seed = 1; // Default seed = 1
+    int qmax = 0; // 0 means process all queries
     double w = 4.0, R = 10000.0; // Default w = 4.0
     bool range = false;
     
     try {
-        parseSearchArgs(argc, argv, input_file, query_file, output_file, type, method,
-                       k, L, kproj, kclusters, nprobe, M, probes, nbits, N, seed, w, R, range);
+    parseSearchArgs(argc, argv, input_file, query_file, output_file, type, method,
+               k, L, kproj, kclusters, nprobe, M, probes, nbits, N, seed, w, R, range, qmax);
         
         // Set default R values based on dataset type
         // Default: R = 2000 for MNIST, R = 2 for SIFT (as per specification)
@@ -47,10 +48,10 @@ int Interface::runSearch(int argc, char* argv[]) {
         
         // Execute the appropriate algorithm
         if (method == "lsh") {
-            return executeLSH(input_file, query_file, output_file, type, k, L, w, N, R, range);
+            return executeLSH(input_file, query_file, output_file, type, k, L, w, N, R, range, qmax);
         }
         else if (method == "hypercube") {
-            return executeHypercube(input_file, query_file, output_file, type, kproj, w, M, probes, N, R, range, seed);
+            return executeHypercube(input_file, query_file, output_file, type, kproj, w, M, probes, N, R, range, seed, qmax);
         }
         else if (method == "ivfflat") {
             return executeIVFFlat(input_file, query_file, output_file, type, kclusters, nprobe, N, R, range, seed);
@@ -74,7 +75,7 @@ void Interface::parseSearchArgs(int argc, char* argv[], std::string& input_file,
                                std::string& type, std::string& method,
                                int& k, int& L, int& kproj, int& kclusters, int& nprobe,
                                int& M, int& probes, int& nbits, int& N, int& seed,
-                               double& w, double& R, bool& range) {
+                               double& w, double& R, bool& range, int& qmax) {
     
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) {
@@ -129,6 +130,10 @@ void Interface::parseSearchArgs(int argc, char* argv[], std::string& input_file,
             std::string range_str = argv[++i];
             range = (range_str == "true");
         }
+        else if (strcmp(argv[i], "-qmax") == 0 && i + 1 < argc) {
+            qmax = std::atoi(argv[++i]);
+            if (qmax < 0) qmax = 0;
+        }
         else if (strcmp(argv[i], "-lsh") == 0) {
             method = "lsh";
         }
@@ -172,7 +177,7 @@ std::vector<std::vector<float>> Interface::parseQueryset(const std::string& file
 
 int Interface::executeLSH(const std::string& input_file, const std::string& query_file,
                          const std::string& output_file, const std::string& type,
-                         int k, int L, double w, int N, double R, bool range) {
+                         int k, int L, double w, int N, double R, bool range, int qmax) {
     
     std::cout << "Executing LSH algorithm..." << std::endl;
     std::cout << "Parameters: k=" << k << ", L=" << L << ", w=" << w 
@@ -191,11 +196,16 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
               << dataset[0].size() << " dimensions" << std::endl;
     std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
     
+    // Compute optimal w parameter based on dataset statistics (like legacy reference)
+    // For LSH with Euclidean distance, we use the same heuristic as Hypercube
+    double computed_w = 20.0 * our_math::compute_w_value(dataset, 1000);
+    std::cout << "Computed w parameter: " << computed_w << " (CLI w=" << w << " will be overridden)" << std::endl;
+    
     // Initialize LSH with default seed = 1
     uint32_t M = 1000007; // Large prime for hash table size
     uint64_t m = 4294967291ULL; // 2^32 - 5
     int seed = 1; // Default seed as per specification
-    LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), static_cast<uint32_t>(w), dataset, seed);
+    LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), static_cast<uint32_t>(computed_w), dataset, seed);
     
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
@@ -216,7 +226,8 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     double total_recall = 0.0;
     int valid_queries = 0;
     
-    for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
+    const size_t queries_to_process = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
+    for (size_t query_idx = 0; query_idx < queries_to_process; ++query_idx) {
         const auto& query = queries[query_idx];
         
         // Approximate search using LSH
@@ -303,9 +314,9 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     // Calculate average metrics
     double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
     double recall_at_n = valid_queries > 0 ? total_recall / valid_queries : 0.0;
-    double avg_approx_time = total_approx_time / queries.size();
-    double avg_true_time = total_true_time / queries.size();
-    double qps = total_time_seconds > 0 ? queries.size() / total_time_seconds : 0.0;
+    double avg_approx_time = queries_to_process > 0 ? total_approx_time / queries_to_process : 0.0;
+    double avg_true_time = queries_to_process > 0 ? total_true_time / queries_to_process : 0.0;
+    double qps = (total_time_seconds > 0) ? (static_cast<double>(queries_to_process) / total_time_seconds) : 0.0;
     
     // Use helper function to print final statistics
     printFinalStatistics(output, avg_af, recall_at_n, qps, avg_approx_time, avg_true_time);
@@ -318,7 +329,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
 
 int Interface::executeHypercube(const std::string& input_file, const std::string& query_file,
                                const std::string& output_file, const std::string& type,
-                               int kproj, double w, int M, int probes, int N, double R, bool range, int seed) {
+                               int kproj, double w, int M, int probes, int N, double R, bool range, int seed, int qmax) {
     
     std::cout << "Executing Hypercube algorithm..." << std::endl;
     std::cout << "Parameters: kproj=" << kproj << ", w=" << w << ", M=" << M 
@@ -342,9 +353,14 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
               << dataset[0].size() << " dimensions" << std::endl;
     std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
     
+    // Compute optimal w parameter based on dataset statistics (like legacy reference)
+    // Legacy: uint32_t w = 20 * our_math::compute_w_value(feature_vectors, 1000);
+    double computed_w = 20.0 * our_math::compute_w_value(dataset, 1000);
+    std::cout << "Computed w parameter: " << computed_w << " (CLI w=" << w << " will be overridden)" << std::endl;
+    
     // Initialize Hypercube with specified seed parameter
     uint64_t m = 4294967291ULL; // 2^32 - 5
-    Hypercube<float> hypercube(kproj, m, M, probes, dataset.size(), w, dataset[0].size(), dataset, seed);
+    Hypercube<float> hypercube(kproj, m, M, probes, dataset.size(), computed_w, dataset[0].size(), dataset, seed);
     
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
@@ -366,7 +382,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     double total_af = 0.0;
     
     // Process queries (limit for testing)
-    size_t max_queries = queries.size(); // Process all queries
+    size_t max_queries = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
     for (size_t query_idx = 0; query_idx < max_queries; ++query_idx) {
         try {
             // Approximate search using Hypercube
@@ -382,7 +398,8 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
             all_distances.reserve(dataset.size());
             
             for (size_t i = 0; i < dataset.size(); ++i) {
-                float dist = metrics::EuclideanDistance(queries[query_idx], dataset[i], queries[query_idx].size());
+                // Use Manhattan distance for ground truth to match Hypercube's approximate metric
+                float dist = metrics::ManhattanDistance(queries[query_idx], dataset[i], queries[query_idx].size());
                 all_distances.emplace_back(dist, static_cast<int>(i));
             }
             
@@ -431,7 +448,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     double avg_recall = successful_queries > 0 ? total_af / successful_queries : 0.0; // Using AF as placeholder for recall
     double avg_approx_time = total_approx_time / max_queries;
     double avg_true_time = total_true_time / max_queries;
-    double qps = max_queries / total_time_seconds;
+    double qps = (total_time_seconds > 0) ? (static_cast<double>(max_queries) / total_time_seconds) : 0.0;
     
     // Output final statistics according to PDF specification
     printFinalStatistics(output, avg_af, avg_recall, qps, avg_approx_time, avg_true_time);

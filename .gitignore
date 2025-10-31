@@ -2,3 +2,4 @@ dataset/*.fvecs
 *.pdf
 *.o
 *.d
+*.txt

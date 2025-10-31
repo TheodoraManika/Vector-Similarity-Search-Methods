@@ -33,6 +33,78 @@ namespace our_math {
         }
         return n;
     }
+
+    // Hamming distance between two 32-bit integers (vertex ids)
+    uint32_t hamming_distance(uint32_t a, uint32_t b) {
+    uint32_t x = a ^ b;
+#if defined(__GNUG__) || defined(__clang__)
+    return static_cast<uint32_t>(__builtin_popcount(x));
+#else
+    uint32_t cnt = 0;
+    while (x) { x &= (x - 1); ++cnt; }
+    return cnt;
+#endif
+    }
+
+    // Hamming distance between two sequences (counts mismatches). Assumes same size.
+    template <typename T>
+    inline std::size_t hamming_distance(const std::vector<T>& a, const std::vector<T>& b) {
+        std::size_t n = a.size();
+        std::size_t cnt = 0;
+        for (std::size_t i = 0; i < n; ++i) {
+            if (a[i] != b[i]) ++cnt;
+        }
+        return cnt;
+    }
+    
+    // Compute optimal w parameter for LSH/Hypercube based on dataset statistics
+    // Sample random pairs and compute their average Manhattan distance
+    // This helps set the "bucket width" appropriately for the data distribution
+    template <typename T>
+    double compute_w_value(const std::vector<std::vector<T>>& dataset, size_t sample_size) {
+        if (dataset.empty() || dataset[0].empty()) {
+            return 4.0; // fallback default
+        }
+        
+        size_t n = dataset.size();
+        size_t dim = dataset[0].size();
+        
+        // Limit sample size to dataset size
+        size_t actual_samples = std::min(sample_size, n * (n - 1) / 2);
+        if (actual_samples == 0) return 4.0;
+        
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<size_t> dist(0, n - 1);
+        
+        double sum_distances = 0.0;
+        size_t valid_samples = 0;
+        
+        for (size_t s = 0; s < actual_samples; ++s) {
+            // Sample two different random vectors
+            size_t i = dist(gen);
+            size_t j = dist(gen);
+            
+            // Ensure they're different
+            while (i == j && n > 1) {
+                j = dist(gen);
+            }
+            
+            // Compute Manhattan distance
+            double dist_sum = 0.0;
+            for (size_t d = 0; d < dim; ++d) {
+                dist_sum += std::abs(static_cast<double>(dataset[i][d]) - static_cast<double>(dataset[j][d]));
+            }
+            
+            sum_distances += dist_sum;
+            valid_samples++;
+        }
+        
+        if (valid_samples == 0) return 4.0;
+        
+        // Return average distance (this will be scaled by caller, e.g., w = 20 * avg)
+        return sum_distances / valid_samples;
+    }
     
     // LSH hash function implementations for Euclidean space
     template <typename T>
@@ -104,4 +176,8 @@ namespace our_math {
     template uint64_t computeID<double>(const std::vector<double>&, const lsh::AmplifiedHashFunction&, uint32_t);
     template uint32_t computeAmplifiedHash<float>(const std::vector<float>&, const lsh::AmplifiedHashFunction&, uint32_t, uint32_t);
     template uint32_t computeAmplifiedHash<double>(const std::vector<double>&, const lsh::AmplifiedHashFunction&, uint32_t, uint32_t);
+    
+    // Template instantiations for compute_w_value
+    template double compute_w_value<float>(const std::vector<std::vector<float>>&, size_t);
+    template double compute_w_value<double>(const std::vector<std::vector<double>>&, size_t);
 }

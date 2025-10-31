@@ -21,6 +21,14 @@ namespace our_math {
     
     // find next prime number >= n (for hash table sizing)
     uint32_t next_prime(uint32_t n);
+
+    // Hamming distance between two 32-bit integers (e.g., hypercube vertices)
+    uint32_t hamming_distance(uint32_t a, uint32_t b);
+    
+    // Compute optimal w parameter for LSH/Hypercube based on dataset statistics
+    // Samples random pairs from dataset and computes average distance
+    template <typename T>
+    double compute_w_value(const std::vector<std::vector<T>>& dataset, size_t sample_size = 1000);
     
     // LSH hash function structures for Euclidean space
     // Basic hash: h(p) = floor((p·v + t) / w) where:
