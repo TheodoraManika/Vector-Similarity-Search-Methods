@@ -5,6 +5,7 @@
 #include <cassert>
 #include <iostream>
 #include <cmath>
+#include <random>
 
 template <typename T>
 IVFFlat<T>::IVFFlat(uint32_t n_clusters, uint32_t n_probe)
@@ -59,9 +60,40 @@ bool IVFFlat<T>::train(const std::vector<std::vector<T>>& data) {
     dataset.reserve(data.size());
     dataset = data;
     
-    // Train k-means clustering
+    // Step 1: Select random subset X' ⊂ X where |X'| ∼ √n
+    size_t n = data.size();
+    size_t subset_size = static_cast<size_t>(std::sqrt(n));
+    
+    // Ensure subset is at least as large as number of clusters
+    subset_size = std::max(subset_size, static_cast<size_t>(n_clusters));
+    subset_size = std::min(subset_size, n);  // Don't exceed dataset size
+    
+    std::cout << "Selecting random subset of size " << subset_size 
+              << " (~√n = ~" << std::sqrt(n) << ") for k-means training..." << std::endl;
+    
+    // Create random subset X' for k-means training
+    std::vector<size_t> indices(n);
+    for (size_t i = 0; i < n; ++i) {
+        indices[i] = i;
+    }
+    
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::shuffle(indices.begin(), indices.end(), gen);
+    
+    std::vector<std::vector<T>> training_subset;
+    training_subset.reserve(subset_size);
+    std::vector<size_t> training_indices;
+    training_indices.reserve(subset_size);
+    
+    for (size_t i = 0; i < subset_size; ++i) {
+        training_subset.push_back(data[indices[i]]);
+        training_indices.push_back(indices[i]);
+    }
+    
+    // Train k-means clustering on subset X'
     kmeans = std::make_unique<KMeans<T>>(n_clusters);
-    kmeans->set_data(data);
+    kmeans->set_data(training_subset);
     
     if (!kmeans->fit()) {
         std::cerr << "Error: K-means clustering failed" << std::endl;
@@ -69,7 +101,7 @@ bool IVFFlat<T>::train(const std::vector<std::vector<T>>& data) {
         return false;
     }
     
-    // Get centroids
+    // Get centroids C = {c1, ..., ck}
     centroids = kmeans->get_centroids();
     
     if (centroids.empty() || centroids.size() != n_clusters) {
@@ -83,13 +115,27 @@ bool IVFFlat<T>::train(const std::vector<std::vector<T>>& data) {
         list.clear();
     }
     
-    // Assign vectors to clusters with progress indication
+    // Step 2 & 3: Assignment for ALL vectors in X
+    // For each x ∈ X, find nearest centroid j*(x) = arg min ||x - cj||²
+    // and append (id(x), x) to inverted list ILj*(x)
+    std::cout << "Assigning all vectors to nearest centroids..." << std::endl;
+    
     for (size_t i = 0; i < data.size(); ++i) {
-        int cluster_id = kmeans->predict(data[i]);
-        if (cluster_id >= 0 && cluster_id < static_cast<int>(n_clusters)) {
-            inverted_lists[cluster_id].push_back(static_cast<int>(i));
-        } else {
-            std::cerr << "Warning: Invalid cluster assignment for vector " << i << std::endl;
+        // Find nearest centroid: j*(x) = arg min ||x - cj||²
+        T min_distance = std::numeric_limits<T>::max();
+        int nearest_cluster = 0;
+        
+        for (size_t j = 0; j < centroids.size(); ++j) {
+            T distance = metrics::EuclideanDistance(data[i], centroids[j], dimensions);
+            if (distance < min_distance) {
+                min_distance = distance;
+                nearest_cluster = static_cast<int>(j);
+            }
+        }
+        
+        // Append (id(x), x) to inverted list ILj*(x)
+        if (nearest_cluster >= 0 && nearest_cluster < static_cast<int>(n_clusters)) {
+            inverted_lists[nearest_cluster].push_back(static_cast<int>(i));
         }
     }
     
@@ -142,13 +188,15 @@ std::vector<int> IVFFlat<T>::find_nearest_clusters(const std::vector<T>& query, 
     std::vector<std::pair<T, int>> cluster_distances;
     cluster_distances.reserve(centroids.size());
     
-    // Calculate distances to all centroids
+    // Step 1 (IVF Query): Evaluate all cells - compute ||q - cj||² for j = 1, ..., k
+    // Using squared distance for coarse search (faster, ordering preserved)
     for (size_t i = 0; i < centroids.size(); ++i) {
-        T distance = metrics::EuclideanDistance(query, centroids[i], dimensions);
-        cluster_distances.emplace_back(distance, static_cast<int>(i));
+        T distance_squared = metrics::EuclideanDistanceSquared(query, centroids[i], dimensions);
+        cluster_distances.emplace_back(distance_squared, static_cast<int>(i));
     }
     
-    // Sort by distance and take n_clusters_to_find closest
+    // Let S ⊂ {1, ..., k} be indices of best b "probe" cells
+    // Sort by distance and take n_clusters_to_find (b) closest
     uint32_t num_to_select = std::min(n_clusters_to_find, static_cast<uint32_t>(cluster_distances.size()));
     std::partial_sort(cluster_distances.begin(), 
                      cluster_distances.begin() + num_to_select,
@@ -213,13 +261,15 @@ std::pair<int, T> IVFFlat<T>::search_nearest(const std::vector<T>& query) const 
         return std::make_pair(-1, std::numeric_limits<T>::max());
     }
     
-    // Find nearest clusters to probe
+    // Step 1: Find nearest b clusters to probe (coarse search)
+    // Returns S ⊂ {1, ..., k} indices of best probe cells
     std::vector<int> clusters_to_probe = find_nearest_clusters(query, n_probe);
     
     int best_idx = -1;
     T best_distance = std::numeric_limits<T>::max();
     
-    // Search in selected clusters
+    // Step 2: Let U = ⋃_{j∈S} ILj - union of inverted lists from probe cells
+    // Compute exact d(q, x) = ||q - x||² for all x ∈ U (fine search)
     for (int cluster_id : clusters_to_probe) {
         const auto& inverted_list = inverted_lists[cluster_id];
         
@@ -233,6 +283,7 @@ std::pair<int, T> IVFFlat<T>::search_nearest(const std::vector<T>& query) const 
         }
     }
     
+    // Step 3: Return nearest x ∈ U for query q
     return std::make_pair(best_idx, best_distance);
 }
 
@@ -250,13 +301,17 @@ std::list<std::pair<int, T>> IVFFlat<T>::search_k_nearest(const std::vector<T>& 
         return std::list<std::pair<int, T>>();
     }
     
-    // Find nearest clusters to probe
+    // Step 1: Find nearest b clusters to probe (coarse search)
+    // Returns S ⊂ {1, ..., k} indices of best probe cells
+    // Time complexity: O(k·d) where k = n_clusters, d = dimensions
     std::vector<int> clusters_to_probe = find_nearest_clusters(query, n_probe);
     
     // Use priority queue to maintain k best candidates (max heap by distance)
     std::priority_queue<std::pair<T, int>> pq;
     
-    // Search in selected clusters
+    // Step 2: Let U = ⋃_{j∈S} ILj - union of inverted lists from probe cells
+    // Compute exact d(q, x) = ||q - x||² for all x ∈ U (fine search)
+    // Time complexity: O(|U|·d) where |U| = total points in probed cells
     for (int cluster_id : clusters_to_probe) {
         const auto& inverted_list = inverted_lists[cluster_id];
         
@@ -272,6 +327,7 @@ std::list<std::pair<int, T>> IVFFlat<T>::search_k_nearest(const std::vector<T>& 
         }
     }
     
+    // Step 3: Return R nearest x ∈ U for query q (candidates in ≥ 1 cells)
     // Convert priority queue to sorted list (ascending order by distance)
     std::list<std::pair<int, T>> result;
     

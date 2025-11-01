@@ -7,12 +7,14 @@
 #include "../../algorithms/hypercube/Hypercube.h"
 #include "../../algorithms/IVFFlat/IVFFlat.h"
 #include "../../algorithms/IVFPQ/IVFPQ.h"
+#include "../../algorithms/BruteForce/BruteForce.h"
 #include "../../metrics/metrics.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <set>
 #include <cstring>
 #include <cassert>
 #include <algorithm>
@@ -26,7 +28,7 @@ Interface::~Interface() {
 
 int Interface::runSearch(int argc, char* argv[]) {
     std::string input_file, query_file, output_file, type, method;
-    int k = 4, L = 5, kproj = 14, kclusters = 10, nprobe = 1;
+    int k = 4, L = 5, kproj = 14, kclusters = 50, nprobe = 5; // Default: kclusters=50, nprobe=5
     int M = 10, probes = 2, nbits = 8, N = 1, seed = 1; // Default seed = 1
     int qmax = 0; // 0 means process all queries
     double w = 4.0, R = 10000.0; // Default w = 4.0
@@ -461,68 +463,296 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
 
 int Interface::executeIVFFlat(const std::string& input_file, const std::string& query_file,
                              const std::string& output_file, const std::string& type,
-                             [[maybe_unused]] int kclusters, [[maybe_unused]] int nprobe, 
-                             [[maybe_unused]] int N, [[maybe_unused]] double R, 
-                             [[maybe_unused]] bool range, [[maybe_unused]] int seed) {
+                             int kclusters, int nprobe, 
+                             int N, double R, 
+                             bool range, int seed) {
     
     std::cout << "Executing IVFFlat algorithm..." << std::endl;
+    std::cout << "Parameters: kclusters=" << kclusters << ", nprobe=" << nprobe 
+              << ", N=" << N << ", R=" << R << ", seed=" << seed << std::endl;
     
     // Parse datasets
     auto dataset = parseDataset(input_file, type);
     auto queries = parseQueryset(query_file, type);
     
+    if (dataset.empty() || queries.empty()) {
+        std::cerr << "Error: Failed to parse datasets." << std::endl;
+        return 1;
+    }
+    
+    std::cout << "Dataset size: " << dataset.size() << " vectors, " 
+              << dataset[0].size() << " dimensions" << std::endl;
+    std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
+    
+    // Set random seed
+    std::srand(seed);
+    
+    // Initialize IVFFlat index
+    IVFFlat<float> ivfflat(kclusters, nprobe);
+    
+    // Train the index
+    std::cout << "Training IVFFlat index..." << std::endl;
+    Utils::AutoTimer train_timer;
+    train_timer.start();
+    
+    if (!ivfflat.train(dataset)) {
+        std::cerr << "Error: IVFFlat training failed" << std::endl;
+        return 1;
+    }
+    
+    double train_time = train_timer.elapsed();
+    std::cout << "Training completed in " << train_time << " seconds" << std::endl;
+    
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
     std::ofstream output(results_output_file);
-    output << "IVFFlat" << std::endl;
-    
-    // TODO: Implement actual IVFFlat algorithm
-    // Placeholder similar to other methods
-    for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
-        std::list<std::pair<int, float>> neighbors;
-        std::list<std::pair<int, float>> true_neighbors;
-        std::list<int> range_results;
-        
-        printSearchResults(output, "IVFFlat", query_idx, neighbors, true_neighbors, range_results, N);
+    if (!output.is_open()) {
+        std::cerr << "Error: Cannot create output file." << std::endl;
+        return 1;
     }
     
-    printFinalStatistics(output, 1.20, 0.70, 60.0, 0.003, 0.010);
+    // Print method name
+    output << "IVFFlat" << std::endl;
+    
+    Utils::AutoTimer total_timer;
+    total_timer.start();
+    double total_approx_time = 0.0;
+    double total_true_time = 0.0;
+    double total_af = 0.0;
+    double total_recall = 0.0;
+    int valid_queries = 0;
+    size_t queries_to_process = queries.size();
+    
+    // Process queries
+    for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
+        const auto& query = queries[query_idx];
+        
+        // Approximate search using IVFFlat
+        Utils::AutoTimer approx_timer;
+        approx_timer.start();
+        std::list<std::pair<int, float>> neighbors;
+        
+        if (N == 1) {
+            auto result = ivfflat.search_nearest(query);
+            if (result.first != -1) {
+                neighbors.push_back(result);
+            }
+        } else {
+            neighbors = ivfflat.search_k_nearest(query, N);
+        }
+        total_approx_time += approx_timer.elapsed();
+        
+        // True (brute force) search
+        Utils::AutoTimer true_timer;
+        true_timer.start();
+        BruteForce<float> brute_force(dataset.size(), dataset[0].size(), dataset);
+        std::list<std::pair<int, float>> true_neighbors = brute_force.kNearestNeighbors(query, N);
+        total_true_time += true_timer.elapsed();
+        
+        // Range search if enabled
+        std::list<int> range_results;
+        if (range) {
+            auto range_neighbors = ivfflat.range_search(query, R);
+            for (const auto& neighbor : range_neighbors) {
+                range_results.push_back(neighbor.first);
+            }
+        }
+        
+        // Calculate metrics for this query
+        if (!neighbors.empty() && !true_neighbors.empty()) {
+            // Approximation Factor (AF)
+            float approx_dist = neighbors.front().second;
+            float true_dist = true_neighbors.front().second;
+            if (true_dist > 0) {
+                double af = approx_dist / true_dist;
+                total_af += af;
+            }
+            
+            // Recall
+            std::set<int> approx_ids;
+            for (const auto& neighbor : neighbors) {
+                approx_ids.insert(neighbor.first);
+            }
+            std::set<int> true_ids;
+            for (const auto& neighbor : true_neighbors) {
+                true_ids.insert(neighbor.first);
+            }
+            
+            int intersection = 0;
+            for (int id : approx_ids) {
+                if (true_ids.find(id) != true_ids.end()) {
+                    intersection++;
+                }
+            }
+            
+            double recall = static_cast<double>(intersection) / N;
+            total_recall += recall;
+            valid_queries++;
+        }
+        
+        // Print results for this query - pass type, query, dataset for proper formatting
+        printSearchResults(output, "IVFFlat", query_idx, neighbors, true_neighbors, range_results, N, type, query, dataset);
+    }
+    
+    double total_time_seconds = total_timer.elapsed();
+    
+    // Calculate and print final statistics
+    double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
+    double avg_recall = valid_queries > 0 ? total_recall / valid_queries : 0.0;
+    double avg_approx_time = queries_to_process > 0 ? total_approx_time / queries_to_process : 0.0;
+    double avg_true_time = queries_to_process > 0 ? total_true_time / queries_to_process : 0.0;
+    double qps = (total_time_seconds > 0) ? (static_cast<double>(queries_to_process) / total_time_seconds) : 0.0;
+    
+    printFinalStatistics(output, avg_af, avg_recall, qps, avg_approx_time, avg_true_time);
     
     output.close();
+    std::cout << "\nResults written to: " << results_output_file << std::endl;
+    std::cout << "Average Approximation Factor: " << avg_af << std::endl;
+    std::cout << "Average Recall: " << avg_recall << std::endl;
+    
     return 0;
 }
 
 int Interface::executeIVFPQ(const std::string& input_file, const std::string& query_file,
                            const std::string& output_file, const std::string& type,
-                           [[maybe_unused]] int kclusters, [[maybe_unused]] int nprobe, 
-                           [[maybe_unused]] int M, [[maybe_unused]] int nbits, 
-                           [[maybe_unused]] int N, [[maybe_unused]] double R, 
-                           [[maybe_unused]] bool range, [[maybe_unused]] int seed) {
+                           int kclusters, int nprobe, 
+                           int M, int nbits, 
+                           int N, double R, 
+                           bool range, int seed) {
     
     std::cout << "Executing IVFPQ algorithm..." << std::endl;
+    std::cout << "Parameters: kclusters=" << kclusters << ", nprobe=" << nprobe 
+              << ", M=" << M << ", nbits=" << nbits 
+              << ", N=" << N << ", R=" << R << ", seed=" << seed << std::endl;
     
     // Parse datasets
     auto dataset = parseDataset(input_file, type);
     auto queries = parseQueryset(query_file, type);
     
+    if (dataset.empty() || queries.empty()) {
+        std::cerr << "Error: Failed to parse datasets." << std::endl;
+        return 1;
+    }
+    
+    std::cout << "Dataset size: " << dataset.size() << " vectors, " 
+              << dataset[0].size() << " dimensions" << std::endl;
+    std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
+    
+    // Set random seed
+    std::srand(seed);
+    
+    // Initialize IVFPQ index
+    IVFPQ<float> ivfpq(kclusters, nprobe, M, nbits, dataset[0].size(), dataset);
+    
+    // Train the index
+    std::cout << "Training IVFPQ index..." << std::endl;
+    Utils::AutoTimer train_timer;
+    train_timer.start();
+    
+    ivfpq.train();
+    
+    double train_time = train_timer.elapsed();
+    std::cout << "Training completed in " << train_time << " seconds" << std::endl;
+    
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
     std::ofstream output(results_output_file);
-    output << "IVFPQ" << std::endl;
-    
-    // TODO: Implement actual IVFPQ algorithm
-    // Placeholder similar to other methods
-    for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
-        std::list<std::pair<int, float>> neighbors;
-        std::list<std::pair<int, float>> true_neighbors;
-        std::list<int> range_results;
-        
-        printSearchResults(output, "IVFPQ", query_idx, neighbors, true_neighbors, range_results, N);
+    if (!output.is_open()) {
+        std::cerr << "Error: Cannot create output file." << std::endl;
+        return 1;
     }
     
-    printFinalStatistics(output, 1.25, 0.65, 50.0, 0.004, 0.010);
+    // Print method name
+    output << "IVFPQ" << std::endl;
+    
+    Utils::AutoTimer total_timer;
+    total_timer.start();
+    double total_approx_time = 0.0;
+    double total_true_time = 0.0;
+    double total_af = 0.0;
+    double total_recall = 0.0;
+    int valid_queries = 0;
+    size_t queries_to_process = queries.size();
+    
+    // Process queries
+    for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
+        const auto& query = queries[query_idx];
+        
+        // Approximate search using IVFPQ
+        Utils::AutoTimer approx_timer;
+        approx_timer.start();
+        std::list<std::pair<int, float>> neighbors;
+        
+        if (N == 1) {
+            auto result = ivfpq.search_nearest(query);
+            if (result.first != -1) {
+                neighbors.push_back(result);
+            }
+        } else {
+            neighbors = ivfpq.search_k_nearest(query, N);
+        }
+        total_approx_time += approx_timer.elapsed();
+        
+        // True (brute force) search
+        Utils::AutoTimer true_timer;
+        true_timer.start();
+        BruteForce<float> brute_force(dataset.size(), dataset[0].size(), dataset);
+        std::list<std::pair<int, float>> true_neighbors = brute_force.kNearestNeighbors(query, N);
+        total_true_time += true_timer.elapsed();
+        
+        // Range search (R-near neighbors)
+        std::list<int> range_result_ids;
+        if (range) {
+            auto range_results = ivfpq.range_search(query, R);
+            for (const auto& neighbor : range_results) {
+                range_result_ids.push_back(neighbor.first);
+            }
+        }
+        
+        // Calculate metrics
+        if (!neighbors.empty() && !true_neighbors.empty()) {
+            float approx_dist = neighbors.front().second;
+            float true_dist = true_neighbors.front().second;
+            if (true_dist > 0) {
+                float af = approx_dist / true_dist;
+                total_af += af;
+            }
+            
+            // Calculate recall
+            std::set<int> approx_set;
+            for (const auto& neighbor : neighbors) {
+                approx_set.insert(neighbor.first);
+            }
+            
+            int matches = 0;
+            for (const auto& true_neighbor : true_neighbors) {
+                if (approx_set.find(true_neighbor.first) != approx_set.end()) {
+                    matches++;
+                }
+            }
+            total_recall += static_cast<double>(matches) / N;
+            valid_queries++;
+        }
+        
+        // Use helper function to print results
+        printSearchResults(output, "IVFPQ", query_idx, neighbors, true_neighbors, range_result_ids, N, type, query, dataset);
+    }
+    
+    double total_time_seconds = total_timer.elapsed();
+    
+    // Calculate average metrics
+    double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
+    double recall_at_n = valid_queries > 0 ? total_recall / valid_queries : 0.0;
+    double qps = (total_time_seconds > 0) ? (static_cast<double>(queries_to_process) / total_time_seconds) : 0.0;
+    double avg_approx_time = queries_to_process > 0 ? total_approx_time / queries_to_process : 0.0;
+    double avg_true_time = queries_to_process > 0 ? total_true_time / queries_to_process : 0.0;
+    
+    // Use helper function to print final statistics
+    printFinalStatistics(output, avg_af, recall_at_n, qps, avg_approx_time, avg_true_time);
     
     output.close();
+    std::cout << "IVFPQ search completed successfully" << std::endl;
+    std::cout << "Results written to: " << results_output_file << std::endl;
     return 0;
 }
 
@@ -533,9 +763,9 @@ void Interface::printSearchResults(std::ofstream& output,
                                    const std::list<std::pair<int, float>>& true_neighbors,
                                    const std::list<int>& range_results,
                                    int N,
-                                   const std::string& type,
-                                   const std::vector<float>& query,
-                                   const std::vector<std::vector<float>>& dataset) {
+                                   [[maybe_unused]] const std::string& type,
+                                   [[maybe_unused]] const std::vector<float>& query,
+                                   [[maybe_unused]] const std::vector<std::vector<float>>& dataset) {
     output << "Query: " << query_id << std::endl;
 
     // iterate exactly N slots
@@ -543,50 +773,27 @@ void Interface::printSearchResults(std::ofstream& output,
     auto true_it = true_neighbors.begin();
 
     for (int i = 1; i <= N; ++i) {
-        int current_neighbor_id = -1;  // Track the LSH neighbor ID for MNIST
-        
+        // Print approximate neighbor and distance
         if (approx_it != neighbors.end()) {
-            current_neighbor_id = approx_it->first;
+            int approx_neighbor_id = approx_it->first;
             float approx_distance = approx_it->second;
             
-            output << "Nearest neighbor-" << i << ": " << current_neighbor_id << std::endl;
-            
-            // MNIST-specific behavior: recompute true distance to LSH-found neighbor
-            // This makes distanceApproximate == distanceTrue (both are actual Euclidean distances)
-            if (type == "mnist" && !query.empty() && !dataset.empty() && 
-                current_neighbor_id >= 0 && current_neighbor_id < static_cast<int>(dataset.size())) {
-                float true_distance = metrics::EuclideanDistance(query, dataset[current_neighbor_id], 
-                                                                 static_cast<int>(query.size()));
-                output << "distanceApproximate: " << std::fixed << std::setprecision(6)
-                       << true_distance << std::endl;
-            } else {
-                // For other algorithms (SIFT, etc): use the LSH distance as-is
-                output << "distanceApproximate: " << std::fixed << std::setprecision(6)
-                       << approx_distance << std::endl;
-            }
+            output << "Nearest neighbor-" << i << ": " << approx_neighbor_id << std::endl;
+            output << "distanceApproximate: " << std::fixed << std::setprecision(6)
+                   << approx_distance << std::endl;
             ++approx_it;
         } else {
             output << "Nearest neighbor-" << i << ": NONE" << std::endl;
             output << "distanceApproximate: " << std::numeric_limits<float>::max() << std::endl;
         }
 
-        // For MNIST: distanceTrue should also be the distance to the LSH-found neighbor
-        // For other datasets: distanceTrue is the distance to the true i-th nearest neighbor
-        if (type == "mnist" && current_neighbor_id >= 0 && !query.empty() && !dataset.empty() &&
-            current_neighbor_id < static_cast<int>(dataset.size())) {
-            float true_distance = metrics::EuclideanDistance(query, dataset[current_neighbor_id], 
-                                                             static_cast<int>(query.size()));
+        // Print true neighbor distance (from brute force)
+        if (true_it != true_neighbors.end()) {
             output << "distanceTrue: " << std::fixed << std::setprecision(6)
-                   << true_distance << std::endl;
+                   << true_it->second << std::endl;
+            ++true_it;
         } else {
-            // Use brute force distance for non-MNIST
-            if (true_it != true_neighbors.end()) {
-                output << "distanceTrue: " << std::fixed << std::setprecision(6)
-                       << true_it->second << std::endl;
-                ++true_it;
-            } else {
-                output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
-            }
+            output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
         }
     }
 

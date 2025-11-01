@@ -43,7 +43,8 @@ To do Myrto:
 - [✓] γιατί το lsh δνε βγάζει 4 γειτονικούς γείτονες και δεν εμφανίζει και το range search για το sift και mnist
 - [✓] κάνε την ίδια διαδικασία για kmeans
 - [ ] sift output 
-- [ ] check input and output for ivfflat and ivfpq because they do not generate output files
-- [ ] do the same that you did for kmeans for ivfflat 
+- [✓] check input and output for ivfflat and ivfpq because they do not generate output files
+- [✓] do the same that you did for kmeans for ivfflat 
 - [ ] try to run for different values 
 - [ ] see why recall n is 0 for lsh and hypercube  in comprehensive testing
+- [ ] !!!when we are done, we need to change the maybe unused clauses for the manually given parameters

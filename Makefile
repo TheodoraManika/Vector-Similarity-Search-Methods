@@ -151,11 +151,19 @@ test-hypercube-sift: $(TARGET)
 test-hypercube-mnist: $(TARGET)
 	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_hypercube_mnist.txt -type mnist -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 4 -R 1500.0 -range true -qmax $(QMAX)
 
-test-ivfflat: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0 -qmax $(QMAX)
+test-ivfflat-sift: $(TARGET)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat_sift.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0 -qmax $(QMAX)
 
-test-ivfpq: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0 -qmax $(QMAX)
+test-ivfflat-mnist: $(TARGET)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfflat_mnist.txt -type mnist -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2000 -qmax $(QMAX)
+
+
+test-ivfpq-sift: $(TARGET)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq_sift.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0 -qmax $(QMAX)
+
+test-ivfpq-mnist: $(TARGET)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfpq_mnist.txt -type mnist -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2000 -qmax $(QMAX)
+
 
 
 # Comprehensive benchmark with experimental study metrics
@@ -186,13 +194,16 @@ help:
 	@echo "  test-lsh-mnist     - Test LSH algorithm with MNIST dataset"
 	@echo "  test-hypercube-sift     - Test Hypercube algorithm with SIFT dataset"
 	@echo "  test-hypercube-mnist     - Test Hypercube algorithm with MNIST dataset"
-	@echo "  test-ivfflat       - Test IVFFlat algorithm"
-	@echo "  test-ivfpq         - Test IVFPQ algorithm"
+	@echo "  test-ivfflat-sift  - Test IVFFlat algorithm with SIFT dataset"
+	@echo "  test-ivfflat-mnist - Test IVFFlat algorithm with MNIST dataset"
+	@echo "  test-ivfpq-sift    - Test IVFPQ algorithm with SIFT dataset"
+	@echo "  test-ivfpq-mnist   - Test IVFPQ algorithm with MNIST dataset"
 	@echo "  install            - Install to /usr/local/bin"
 	
 # Phony targets
 .PHONY: all all-tests debug clean rebuild install comprehensive-benchmark visual-benchmark docs help
-.PHONY: test-lsh test-lsh-sift test-lsh-mnist test-hypercube test-ivfflat test-ivfpq
+.PHONY: test-lsh test-lsh-sift test-lsh-mnist test-hypercube test-hypercube-sift test-hypercube-mnist
+.PHONY: test-ivfflat test-ivfflat-sift test-ivfflat-mnist test-ivfpq test-ivfpq-sift test-ivfpq-mnist
 
 # Dependencies (basic)
 $(OBJ_DIR)/main.o: main.cpp $(UTILS_DIR)/interface/Interface.h
