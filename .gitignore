@@ -2,3 +2,7 @@ dataset/*.fvecs
 *.pdf
 *.o
 *.d
+
+# Ignore large result files
+results/*.txt
+results/output_*.txt
