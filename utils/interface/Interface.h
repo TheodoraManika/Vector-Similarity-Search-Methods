@@ -55,12 +55,15 @@ public:
     
     // Output functions following exact assignment format
     void printSearchResults(std::ofstream& output,
-                                   [[maybe_unused]] const std::string& method_name,
+                                   const std::string& method_name,
                                    int query_id,
                                    const std::list<std::pair<int, float>>& neighbors,
                                    const std::list<std::pair<int, float>>& true_neighbors,
                                    const std::list<int>& range_results,
-                                   int N);
+                                   int N,
+                                   const std::string& type = "",
+                                   const std::vector<float>& query = std::vector<float>(),
+                                   const std::vector<std::vector<float>>& dataset = std::vector<std::vector<float>>());
     
     void printFinalStatistics(std::ofstream& output, double avg_af, double recall_at_n,
                                      double qps, double t_approx_avg, double t_true_avg);
