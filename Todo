@@ -16,9 +16,14 @@ To do Theodora:
 - [✓] hypercube.h and .cpp
 - [✓] other helpful function
 - [✓] checking hypercube implementation until correct
-- [ ] make sure hypercube works 
+- [✓] make sure hypercube works 
 - [ ] make sure timer works as intended
-- [ ] make sure i have the correct input values for hypercube from the command line 
+- [ ] print timer results
+- [✓] make sure i have the correct input values for hypercube from the command line 
+- [ ] save brute force results so i wont compute them again and again
+- [ ] compute parallel for better time management
+- [ ] check ivpq implementation until correct
+- [ ] try many parameters
  
 To do Myrto:
 - [✓] διαβάζεις διαφάνειες και βλέπεις αν πρέπει να γίνει κάποια αλλαγή στους κώδικες πχ κάποια πράξη δεν έγινε για lsh
@@ -37,3 +42,8 @@ To do Myrto:
 - [✓] δες τις διαφάνειες και κάθε γράμμη κώδικα αν γίνονται όλα όσα ζητάει ή αν γίνονται οι σωστές πράξεις ή με τη σωστή σειρά
 - [✓] γιατί το lsh δνε βγάζει 4 γειτονικούς γείτονες και δεν εμφανίζει και το range search για το sift και mnist
 - [✓] κάνε την ίδια διαδικασία για kmeans
+- [ ] sift output 
+- [ ] check input and output for ivfflat and ivfpq because they do not generate output files
+- [ ] do the same that you did for kmeans for ivfflat 
+- [ ] try to run for different values 
+- [ ] see why recall n is 0 for lsh and hypercube  in comprehensive testing
