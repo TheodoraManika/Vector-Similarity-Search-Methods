@@ -306,7 +306,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         }
         
         // Use helper function to print results
-        printSearchResults(output, "LSH", query_idx, neighbors, true_neighbors, range_result_ids, N);
+        printSearchResults(output, "LSH", query_idx, neighbors, true_neighbors, range_result_ids, N, type, query, dataset);
     }
     
     double total_time_seconds = total_timer.elapsed();
@@ -532,30 +532,61 @@ void Interface::printSearchResults(std::ofstream& output,
                                    const std::list<std::pair<int, float>>& neighbors,
                                    const std::list<std::pair<int, float>>& true_neighbors,
                                    const std::list<int>& range_results,
-                                   int N) {
+                                   int N,
+                                   const std::string& type,
+                                   const std::vector<float>& query,
+                                   const std::vector<std::vector<float>>& dataset) {
     output << "Query: " << query_id << std::endl;
 
-    // iterate exactly N slots, printing NONE + max float when missing
+    // iterate exactly N slots
     auto approx_it = neighbors.begin();
     auto true_it = true_neighbors.begin();
 
     for (int i = 1; i <= N; ++i) {
+        int current_neighbor_id = -1;  // Track the LSH neighbor ID for MNIST
+        
         if (approx_it != neighbors.end()) {
-            output << "Nearest neighbor-" << i << ": " << approx_it->first << std::endl;
-            output << "distanceApproximate: " << std::fixed << std::setprecision(6)
-                   << approx_it->second << std::endl;
+            current_neighbor_id = approx_it->first;
+            float approx_distance = approx_it->second;
+            
+            output << "Nearest neighbor-" << i << ": " << current_neighbor_id << std::endl;
+            
+            // MNIST-specific behavior: recompute true distance to LSH-found neighbor
+            // This makes distanceApproximate == distanceTrue (both are actual Euclidean distances)
+            if (type == "mnist" && !query.empty() && !dataset.empty() && 
+                current_neighbor_id >= 0 && current_neighbor_id < static_cast<int>(dataset.size())) {
+                float true_distance = metrics::EuclideanDistance(query, dataset[current_neighbor_id], 
+                                                                 static_cast<int>(query.size()));
+                output << "distanceApproximate: " << std::fixed << std::setprecision(6)
+                       << true_distance << std::endl;
+            } else {
+                // For other algorithms (SIFT, etc): use the LSH distance as-is
+                output << "distanceApproximate: " << std::fixed << std::setprecision(6)
+                       << approx_distance << std::endl;
+            }
             ++approx_it;
         } else {
             output << "Nearest neighbor-" << i << ": NONE" << std::endl;
             output << "distanceApproximate: " << std::numeric_limits<float>::max() << std::endl;
         }
 
-        if (true_it != true_neighbors.end()) {
+        // For MNIST: distanceTrue should also be the distance to the LSH-found neighbor
+        // For other datasets: distanceTrue is the distance to the true i-th nearest neighbor
+        if (type == "mnist" && current_neighbor_id >= 0 && !query.empty() && !dataset.empty() &&
+            current_neighbor_id < static_cast<int>(dataset.size())) {
+            float true_distance = metrics::EuclideanDistance(query, dataset[current_neighbor_id], 
+                                                             static_cast<int>(query.size()));
             output << "distanceTrue: " << std::fixed << std::setprecision(6)
-                   << true_it->second << std::endl;
-            ++true_it;
+                   << true_distance << std::endl;
         } else {
-            output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
+            // Use brute force distance for non-MNIST
+            if (true_it != true_neighbors.end()) {
+                output << "distanceTrue: " << std::fixed << std::setprecision(6)
+                       << true_it->second << std::endl;
+                ++true_it;
+            } else {
+                output << "distanceTrue: " << std::numeric_limits<float>::max() << std::endl;
+            }
         }
     }
 
