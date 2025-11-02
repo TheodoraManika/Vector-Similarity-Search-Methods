@@ -114,10 +114,15 @@ std::vector<std::vector<T>> ProductQuantizer<T>::compute_distance_table(const st
         std::vector<T> query_subvec(query.begin() + m * subspace_dim,
                                   query.begin() + (m + 1) * subspace_dim);
         
-        // Compute distances to all centroids in this subspace
-        for (uint32_t centroid_id = 0; centroid_id < codebook_size; ++centroid_id) {
-            distance_table[m][centroid_id] = 
-                metrics::EuclideanDistance(query_subvec, codebooks[m][centroid_id], query_subvec.size());
+        // Step 2 (Query): Build LUT[i][h] = ||ri(q) - ci,h||² (SQUARED distance)
+        // Compute SQUARED distances to all centroids in this subspace
+        for (uint32_t h = 0; h < codebook_size; ++h) {
+            T dist_squared = 0;
+            for (uint32_t d = 0; d < subspace_dim; ++d) {
+                T diff = query_subvec[d] - codebooks[m][h][d];
+                dist_squared += diff * diff;
+            }
+            distance_table[m][h] = dist_squared;
         }
     }
     
@@ -148,27 +153,98 @@ IVFPQ<T>::~IVFPQ() {}
 
 template <typename T>
 void IVFPQ<T>::train() {
-    // Train coarse quantizer
-    std::cout << "  Training coarse quantizer (" << n_clusters << " clusters)..." << std::flush;
-    coarse_quantizer->set_data(dataset);
+    std::cout << "Training IVFPQ..." << std::endl;
+    
+    // Step 1 & 2: Train coarse quantizer on subset (like IVFFlat)
+    std::cout << "  Step 1-2: Training coarse quantizer (" << n_clusters << " clusters)..." << std::flush;
+    
+    // Use subset for k-means training (like IVFFlat)
+    size_t n = dataset.size();
+    size_t subset_size = static_cast<size_t>(std::sqrt(n));
+    subset_size = std::max(subset_size, static_cast<size_t>(n_clusters));
+    subset_size = std::min(subset_size, n);
+    
+    // Create random subset
+    std::vector<size_t> indices(n);
+    for (size_t i = 0; i < n; ++i) {
+        indices[i] = i;
+    }
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::shuffle(indices.begin(), indices.end(), gen);
+    
+    std::vector<std::vector<T>> training_subset;
+    training_subset.reserve(subset_size);
+    for (size_t i = 0; i < subset_size; ++i) {
+        training_subset.push_back(dataset[indices[i]]);
+    }
+    
+    coarse_quantizer->set_data(training_subset);
     coarse_quantizer->fit();
     centroids = coarse_quantizer->get_centroids();
     std::cout << " done" << std::endl;
     
-    // Train product quantizer
-    product_quantizer->train(dataset);
+    // Step 3-4: Compute residuals for all vectors and prepare for PQ training
+    std::cout << "  Step 3-4: Computing residuals for all vectors..." << std::flush;
+    std::vector<std::vector<T>> residuals;
+    residuals.reserve(dataset.size());
+    
+    for (const auto& vector : dataset) {
+        // Find nearest centroid
+        T min_dist = std::numeric_limits<T>::max();
+        int nearest_cluster = 0;
+        
+        for (size_t j = 0; j < centroids.size(); ++j) {
+            T dist = metrics::EuclideanDistanceSquared(vector, centroids[j], vector_dim);
+            if (dist < min_dist) {
+                min_dist = dist;
+                nearest_cluster = static_cast<int>(j);
+            }
+        }
+        
+        // Step 3: Compute residual r(x) = x - c(x)
+        std::vector<T> residual(vector_dim);
+        for (uint32_t d = 0; d < vector_dim; ++d) {
+            residual[d] = vector[d] - centroids[nearest_cluster][d];
+        }
+        
+        residuals.push_back(residual);
+    }
+    std::cout << " done" << std::endl;
+    
+    // Step 5: Train product quantizer on residuals (not original vectors!)
+    std::cout << "  Step 5: Training Product Quantizer on residuals..." << std::endl;
+    product_quantizer->train(residuals);
 }
 
 template <typename T>
 void IVFPQ<T>::add_vectors(const std::vector<std::vector<T>>& vectors) {
+    std::cout << "  Step 6-8: Encoding and adding vectors to inverted lists..." << std::endl;
+    
     for (size_t i = 0; i < vectors.size(); ++i) {
-        // Assign to coarse cluster
-        int cluster_id = coarse_quantizer->predict(vectors[i]);
+        // Step 2: Assign to nearest coarse cluster c(x)
+        T min_dist = std::numeric_limits<T>::max();
+        int cluster_id = 0;
         
-        // Encode with product quantizer
-        auto codes = product_quantizer->encode(vectors[i]);
+        for (size_t j = 0; j < centroids.size(); ++j) {
+            T dist = metrics::EuclideanDistanceSquared(vectors[i], centroids[j], vector_dim);
+            if (dist < min_dist) {
+                min_dist = dist;
+                cluster_id = static_cast<int>(j);
+            }
+        }
         
-        // Add to inverted list
+        // Step 3: Compute residual r(x) = x - c(x)
+        std::vector<T> residual(vector_dim);
+        for (uint32_t d = 0; d < vector_dim; ++d) {
+            residual[d] = vectors[i][d] - centroids[cluster_id][d];
+        }
+        
+        // Step 6-7: Encode residual with product quantizer
+        // codei(x) = arg minh ||ri(x) - ci,h||²
+        auto codes = product_quantizer->encode(residual);
+        
+        // Step 8: Append (id(x), PQ(x)) to inverted list ILc(x)
         inverted_lists[cluster_id].emplace_back(static_cast<int>(i), codes);
     }
 }
@@ -184,11 +260,8 @@ std::pair<int, T> IVFPQ<T>::search_nearest(const std::vector<T>& query) const {
 
 template <typename T>
 std::list<std::pair<int, T>> IVFPQ<T>::search_k_nearest(const std::vector<T>& query, uint32_t k) const {
-    // Find nearest clusters to probe
+    // Step 1 (Query): Score centroids - compute ||q - cj||² and select top b (nprobe) clusters
     auto clusters = find_nearest_clusters(query, nprobe);
-    
-    // Compute distance table for query
-    auto distance_table = product_quantizer->compute_distance_table(query);
     
     // Priority queue for k nearest neighbors
     std::priority_queue<std::pair<T, int>> pq;
@@ -197,12 +270,25 @@ std::list<std::pair<int, T>> IVFPQ<T>::search_k_nearest(const std::vector<T>& qu
     for (int cluster_id : clusters) {
         const auto& inverted_list = inverted_lists[cluster_id];
         
+        // Step 2 (Query): For each selected cluster cj
+        // Compute residual r(q) = q - cj
+        std::vector<T> query_residual(vector_dim);
+        for (uint32_t d = 0; d < vector_dim; ++d) {
+            query_residual[d] = query[d] - centroids[cluster_id][d];
+        }
+        
+        // Split r(q) = [r1(q), ..., rM(q)]
+        // Build LUT[i][h] = ||ri(q) - ci,h||² for i=1,...,M, h=1,...,s
+        auto distance_table = product_quantizer->compute_distance_table(query_residual);
+        
+        // Step 3 (Query): For each x in U (union of probed lists)
         for (const auto& entry : inverted_list) {
             int vec_idx = entry.first;
-            const auto& codes = entry.second;
+            const auto& codes = entry.second;  // PQ(x) = [code1(x), ..., codeM(x)]
             
-            // Compute approximate distance using PQ
-            T distance = compute_pq_distance(query, codes, distance_table);
+            // Asymmetric Distance Computation (ADC):
+            // d(q, x) = Σ(i=1 to M) LUT[i][codei(x)]
+            T distance = compute_pq_distance(query_residual, codes, distance_table);
             
             if (pq.size() < k) {
                 pq.emplace(distance, vec_idx);
@@ -213,7 +299,7 @@ std::list<std::pair<int, T>> IVFPQ<T>::search_k_nearest(const std::vector<T>& qu
         }
     }
     
-    // Convert to list
+    // Step 4 (Query): Return R nearest points from U
     std::list<std::pair<int, T>> result;
     while (!pq.empty()) {
         result.emplace_front(pq.top().second, pq.top().first);
@@ -225,11 +311,8 @@ std::list<std::pair<int, T>> IVFPQ<T>::search_k_nearest(const std::vector<T>& qu
 
 template <typename T>
 std::list<std::pair<int, T>> IVFPQ<T>::range_search(const std::vector<T>& query, T radius) const {
-    // Find nearest clusters to probe
+    // Step 1 (Query): Score centroids and select top b (nprobe) clusters
     auto clusters = find_nearest_clusters(query, nprobe);
-    
-    // Compute distance table for query
-    auto distance_table = product_quantizer->compute_distance_table(query);
     
     std::list<std::pair<int, T>> result;
     
@@ -237,12 +320,22 @@ std::list<std::pair<int, T>> IVFPQ<T>::range_search(const std::vector<T>& query,
     for (int cluster_id : clusters) {
         const auto& inverted_list = inverted_lists[cluster_id];
         
+        // Step 2 (Query): Compute residual r(q) = q - cj and build LUT
+        std::vector<T> query_residual(vector_dim);
+        for (uint32_t d = 0; d < vector_dim; ++d) {
+            query_residual[d] = query[d] - centroids[cluster_id][d];
+        }
+        
+        // Build LUT[i][h] = ||ri(q) - ci,h||²
+        auto distance_table = product_quantizer->compute_distance_table(query_residual);
+        
+        // Step 3 (Query): For each x in U, compute ADC distance
         for (const auto& entry : inverted_list) {
             int vec_idx = entry.first;
             const auto& codes = entry.second;
             
-            // Compute approximate distance using PQ
-            T distance = compute_pq_distance(query, codes, distance_table);
+            // ADC: d(q, x) = Σ LUT[i][codei(x)]
+            T distance = compute_pq_distance(query_residual, codes, distance_table);
             
             if (distance <= radius) {
                 result.emplace_back(vec_idx, distance);
@@ -258,13 +351,14 @@ std::vector<int> IVFPQ<T>::find_nearest_clusters(const std::vector<T>& query, ui
     std::vector<std::pair<T, int>> cluster_distances;
     cluster_distances.reserve(centroids.size());
     
-    // Calculate distances to all centroids
+    // Step 1 (Query): Score centroids - compute ||q - cj||² for all j
+    // Using squared distance for coarse search (faster, ordering preserved)
     for (size_t i = 0; i < centroids.size(); ++i) {
-        T distance = metrics::EuclideanDistance(query, centroids[i], query.size());
-        cluster_distances.emplace_back(distance, static_cast<int>(i));
+        T distance_squared = metrics::EuclideanDistanceSquared(query, centroids[i], vector_dim);
+        cluster_distances.emplace_back(distance_squared, static_cast<int>(i));
     }
     
-    // Sort by distance and take n_clusters_to_find closest
+    // Select top b (nprobe) clusters
     std::partial_sort(cluster_distances.begin(), 
                      cluster_distances.begin() + std::min(n_clusters_to_find, static_cast<uint32_t>(cluster_distances.size())),
                      cluster_distances.end());
@@ -281,6 +375,9 @@ std::vector<int> IVFPQ<T>::find_nearest_clusters(const std::vector<T>& query, ui
 template <typename T>
 T IVFPQ<T>::compute_pq_distance([[maybe_unused]] const std::vector<T>& query, const std::vector<uint8_t>& codes,
                                 const std::vector<std::vector<T>>& distance_table) const {
+    // Step 3 (Query): Asymmetric Distance Computation (ADC)
+    // d(q, x) = Σ(i=1 to M) LUT[i][codei(x)]
+    // Since LUT contains squared distances, this computes the sum of squared subspace distances
     T total_distance = 0;
     
     for (uint32_t m = 0; m < M; ++m) {

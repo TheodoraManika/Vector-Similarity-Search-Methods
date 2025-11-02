@@ -682,6 +682,16 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
     double train_time = train_timer.elapsed();
     std::cout << "Training completed in " << train_time << " seconds" << std::endl;
     
+    // Add vectors to the index (compute residuals and encode)
+    std::cout << "Adding vectors to index..." << std::endl;
+    Utils::AutoTimer add_timer;
+    add_timer.start();
+    
+    ivfpq.add_vectors(dataset);
+    
+    double add_time = add_timer.elapsed();
+    std::cout << "Added " << dataset.size() << " vectors in " << add_time << " seconds" << std::endl;
+    
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
     std::ofstream output(results_output_file);
