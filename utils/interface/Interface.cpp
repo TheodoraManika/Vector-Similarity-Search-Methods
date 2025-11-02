@@ -33,10 +33,11 @@ int Interface::runSearch(int argc, char* argv[]) {
     int qmax = 0; // 0 means process all queries
     double w = 4.0, R = 10000.0; // Default w = 4.0
     bool range = false;
+    bool auto_w = false; // When true, compute data-driven w and override CLI
     
     try {
     parseSearchArgs(argc, argv, input_file, query_file, output_file, type, method,
-               k, L, kproj, kclusters, nprobe, M, probes, nbits, N, seed, w, R, range, qmax);
+               k, L, kproj, kclusters, nprobe, M, probes, nbits, N, seed, w, R, range, qmax, auto_w);
         
         // Set default R values based on dataset type
         // Default: R = 2000 for MNIST, R = 2 for SIFT (as per specification)
@@ -50,10 +51,10 @@ int Interface::runSearch(int argc, char* argv[]) {
         
         // Execute the appropriate algorithm
         if (method == "lsh") {
-            return executeLSH(input_file, query_file, output_file, type, k, L, w, N, R, range, qmax);
+            return executeLSH(input_file, query_file, output_file, type, k, L, w, N, R, range, qmax, auto_w);
         }
         else if (method == "hypercube") {
-            return executeHypercube(input_file, query_file, output_file, type, kproj, w, M, probes, N, R, range, seed, qmax);
+            return executeHypercube(input_file, query_file, output_file, type, kproj, w, M, probes, N, R, range, seed, qmax, auto_w);
         }
         else if (method == "ivfflat") {
             return executeIVFFlat(input_file, query_file, output_file, type, kclusters, nprobe, N, R, range, seed, qmax);
@@ -77,7 +78,7 @@ void Interface::parseSearchArgs(int argc, char* argv[], std::string& input_file,
                                std::string& type, std::string& method,
                                int& k, int& L, int& kproj, int& kclusters, int& nprobe,
                                int& M, int& probes, int& nbits, int& N, int& seed,
-                               double& w, double& R, bool& range, int& qmax) {
+                               double& w, double& R, bool& range, int& qmax, bool& auto_w) {
     
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-d") == 0 && i + 1 < argc) {
@@ -136,6 +137,10 @@ void Interface::parseSearchArgs(int argc, char* argv[], std::string& input_file,
             qmax = std::atoi(argv[++i]);
             if (qmax < 0) qmax = 0;
         }
+        else if (strcmp(argv[i], "-auto_w") == 0 && i + 1 < argc) {
+            std::string v = argv[++i];
+            auto_w = (v == "true" || v == "1" || v == "yes");
+        }
         else if (strcmp(argv[i], "-lsh") == 0) {
             method = "lsh";
         }
@@ -179,7 +184,7 @@ std::vector<std::vector<float>> Interface::parseQueryset(const std::string& file
 
 int Interface::executeLSH(const std::string& input_file, const std::string& query_file,
                          const std::string& output_file, const std::string& type,
-                         int k, int L, double w, int N, double R, bool range, int qmax) {
+                         int k, int L, double w, int N, double R, bool range, int qmax, bool auto_w) {
     
     std::cout << "Executing LSH algorithm..." << std::endl;
     std::cout << "Parameters: k=" << k << ", L=" << L << ", w=" << w 
@@ -198,16 +203,21 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
               << dataset[0].size() << " dimensions" << std::endl;
     std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
     
-    // Compute optimal w parameter based on dataset statistics (like legacy reference)
-    // For LSH with Euclidean distance, we use the same heuristic as Hypercube
-    double computed_w = 20.0 * our_math::compute_w_value(dataset, 1000);
-    std::cout << "Computed w parameter: " << computed_w << " (CLI w=" << w << " will be overridden)" << std::endl;
+    // Determine w parameter
+    double used_w = w;
+    if (auto_w) {
+        double computed_w = 20.0 * our_math::compute_w_value(dataset, 1000);
+        used_w = computed_w;
+        std::cout << "Computed w parameter: " << computed_w << " (overriding CLI w due to -auto_w)" << std::endl;
+    } else {
+        std::cout << "Using CLI w parameter: " << w << std::endl;
+    }
     
     // Initialize LSH with default seed = 1
     uint32_t M = 1000007; // Large prime for hash table size
     uint64_t m = 4294967291ULL; // 2^32 - 5
     int seed = 1; // Default seed as per specification
-    LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), static_cast<uint32_t>(computed_w), dataset, seed);
+    LSH<float> lsh(L, m, M, dataset.size(), k, dataset[0].size(), static_cast<uint32_t>(used_w), dataset, seed);
     
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
@@ -271,32 +281,35 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         // Calculate AF (Approximation Factor) for this query
         // AF = distanceApproximate / distanceTrue for the first neighbor
         double query_af = 0.0;
+        double query_recall = 0.0;
+        
         if (!neighbors.empty() && !true_neighbors.empty()) {
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             if (true_dist > 0) {
                 query_af = approx_dist / true_dist;
             }
-        }
-        
-        // Calculate Recall@N for this query
-        // Recall@N = (number of true neighbors found in approximate results) / N
-        std::unordered_set<int> approx_ids;
-        for (const auto& neighbor : neighbors) {
-            approx_ids.insert(neighbor.first);
-        }
-        
-        int matches = 0;
-        for (const auto& true_neighbor : true_neighbors) {
-            if (approx_ids.count(true_neighbor.first)) {
-                matches++;
+            
+            // Calculate Recall@N for this query
+            // Recall@N = (number of true neighbors found in approximate results) / N
+            std::unordered_set<int> approx_ids;
+            for (const auto& neighbor : neighbors) {
+                approx_ids.insert(neighbor.first);
             }
+            
+            int matches = 0;
+            for (const auto& true_neighbor : true_neighbors) {
+                if (approx_ids.count(true_neighbor.first)) {
+                    matches++;
+                }
+            }
+            query_recall = static_cast<double>(matches) / N;
+            
+            valid_queries++;
         }
-        double query_recall = static_cast<double>(matches) / N;
         
         total_af += query_af;
         total_recall += query_recall;
-        valid_queries++;
         
         // Range search if requested
         std::list<int> range_result_ids;
@@ -331,7 +344,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
 
 int Interface::executeHypercube(const std::string& input_file, const std::string& query_file,
                                const std::string& output_file, const std::string& type,
-                               int kproj, double w, int M, int probes, int N, double R, bool range, int seed, int qmax) {
+                               int kproj, double w, int M, int probes, int N, double R, bool range, int seed, int qmax, bool auto_w) {
     
     std::cout << "Executing Hypercube algorithm..." << std::endl;
     std::cout << "Parameters: kproj=" << kproj << ", w=" << w << ", M=" << M 
@@ -355,14 +368,19 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
               << dataset[0].size() << " dimensions" << std::endl;
     std::cout << "Query set size: " << queries.size() << " vectors" << std::endl;
     
-    // Compute optimal w parameter based on dataset statistics (like legacy reference)
-    // Legacy: uint32_t w = 20 * our_math::compute_w_value(feature_vectors, 1000);
-    double computed_w = 20.0 * our_math::compute_w_value(dataset, 1000);
-    std::cout << "Computed w parameter: " << computed_w << " (CLI w=" << w << " will be overridden)" << std::endl;
+    // Determine w parameter
+    double used_w_hc = w;
+    if (auto_w) {
+        double computed_w = 20.0 * our_math::compute_w_value(dataset, 1000);
+        used_w_hc = computed_w;
+        std::cout << "Computed w parameter: " << computed_w << " (overriding CLI w due to -auto_w)" << std::endl;
+    } else {
+        std::cout << "Using CLI w parameter: " << w << std::endl;
+    }
     
     // Initialize Hypercube with specified seed parameter
     uint64_t m = 4294967291ULL; // 2^32 - 5
-    Hypercube<float> hypercube(kproj, m, M, probes, dataset.size(), computed_w, dataset[0].size(), dataset, seed);
+    Hypercube<float> hypercube(kproj, m, M, probes, dataset.size(), used_w_hc, dataset[0].size(), dataset, seed);
     
     // Ensure output file goes to results directory
     std::string results_output_file = Utils::FileUtils::ensureResultsPath(output_file);
@@ -574,6 +592,8 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
         
         // Calculate metrics for this query
         if (!neighbors.empty() && !true_neighbors.empty()) {
+            valid_queries++;
+            
             // Approximation Factor (AF)
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
@@ -601,7 +621,6 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
             
             double recall = static_cast<double>(intersection) / N;
             total_recall += recall;
-            valid_queries++;
         }
 
         // Ensure we print exactly N approximate neighbors (pad with true neighbors if missing)
@@ -749,6 +768,8 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
         
         // Calculate metrics
         if (!neighbors.empty() && !true_neighbors.empty()) {
+            valid_queries++;
+            
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             if (true_dist > 0) {
@@ -769,7 +790,6 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
                 }
             }
             total_recall += static_cast<double>(matches) / N;
-            valid_queries++;
         }
 
         // Ensure we print exactly N approximate neighbors (pad with true neighbors if missing)
