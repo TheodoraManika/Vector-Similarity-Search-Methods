@@ -17,12 +17,13 @@ To do Theodora:
 - [✓] other helpful function
 - [✓] checking hypercube implementation until correct
 - [✓] make sure hypercube works 
-- [ ] make sure timer works as intended
-- [ ] print timer results
+- [✓] make sure timer works as intended
+- [✓] print timer results
 - [✓] make sure i have the correct input values for hypercube from the command line 
-- [ ] save brute force results so i wont compute them again and again
-- [ ] compute parallel for better time management
-- [ ] check ivpq implementation until correct
+- [✓] save brute force results so i wont compute them again and again
+- [✓] compute parallel for better time management
+- [✓] check ivpq implementation until correct
+- [ ] recall implementation i swrong
 - [ ] try many parameters
  
 To do Myrto:

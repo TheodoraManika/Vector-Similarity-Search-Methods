@@ -322,7 +322,8 @@ std::pair<int, T> LSH<T>::NearestNeighbour(const std::vector<T>& query_vector) {
     for (uint32_t table_idx = 0; table_idx < L; ++table_idx, ++amp_it) {
         // Compute hash value and ID for query
         uint32_t hash_val = our_math::computeAmplifiedHash(query_vector, *amp_it, w, M);
-        uint64_t query_id = our_math::computeID(query_vector, *amp_it, w);
+        // Note: We intentionally do NOT filter candidates by ID equality anymore
+        // because it was too strict and filtered out correct neighbors.
         
         // Get candidates from this bucket
         auto bucket_it = lsh_tables[table_idx].find(hash_val);
@@ -331,7 +332,6 @@ std::pair<int, T> LSH<T>::NearestNeighbour(const std::vector<T>& query_vector) {
         
             for (const auto& candidate : candidates) {
                 int candidate_idx = candidate.first;
-                uint64_t candidate_id = candidate.second;
                 
                 // Skip if already checked (O(1) average case with unordered_set)
                 if (checked_indices.count(candidate_idx)) {
@@ -342,12 +342,6 @@ std::pair<int, T> LSH<T>::NearestNeighbour(const std::vector<T>& query_vector) {
                 // Validate candidate index
                 if (candidate_idx < 0 || candidate_idx >= static_cast<int>(feature_vectors.size())) {
                     continue; // Skip invalid indices
-                }
-                
-                // Only compute distance if IDs match (querying trick)
-                // ID(p) = ID(q) is a necessary condition for collision in the same w-cell
-                if (candidate_id != query_id) {
-                    continue;
                 }
                 
                 // Compute actual distance
@@ -399,7 +393,7 @@ std::list<std::pair<int, T>> LSH<T>::kNearestNeighbour(const std::vector<T>& que
     for (uint32_t table_idx = 0; table_idx < L; ++table_idx, ++amp_it) {
         // Compute hash value and ID for query gi(q)
         uint32_t hash_val = our_math::computeAmplifiedHash(query_vector, *amp_it, w, M);
-        uint64_t query_id = our_math::computeID(query_vector, *amp_it, w);
+        // Note: Candidate ID equality filter is disabled to avoid over-filtering.
         
         // Get candidates from bucket gi(q)
         auto bucket_it = lsh_tables[table_idx].find(hash_val);
@@ -408,7 +402,6 @@ std::list<std::pair<int, T>> LSH<T>::kNearestNeighbour(const std::vector<T>& que
         
             for (const auto& candidate : candidates) {
                 int candidate_idx = candidate.first;
-                uint64_t candidate_id = candidate.second;
                 
                 // Skip if already checked (avoid duplicate distance computations)
                 if (checked_indices.count(candidate_idx)) {
@@ -420,12 +413,6 @@ std::list<std::pair<int, T>> LSH<T>::kNearestNeighbour(const std::vector<T>& que
                 // Validate candidate index
                 if (candidate_idx < 0 || candidate_idx >= static_cast<int>(feature_vectors.size())) {
                     continue; // Skip invalid indices
-                }
-                
-                // Only compute distance if IDs match (querying trick)
-                // ID(p) = ID(q) is a necessary condition for collision in the same w-cell
-                if (candidate_id != query_id) {
-                    continue;
                 }
                 
                 // Compute actual distance dist(q, p)

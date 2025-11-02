@@ -33,6 +33,9 @@ class Hypercube {
 
         std::vector<std::vector<T>> feature_vectors;
 
+        // Helper: generate all vertices at exact Hamming distance from a given vertex
+        std::vector<uint32_t> neighbors_by_hamming(uint32_t vertex, uint32_t dist) const;
+
     public:
         // Class constructor with proper parameter names matching the specification
         Hypercube(const uint32_t kproj, uint64_t m, uint32_t M, uint32_t probes, 

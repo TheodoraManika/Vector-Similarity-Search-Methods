@@ -26,7 +26,7 @@ COMPREHENSIVE_BENCHMARK = comprehensive_benchmark
 VISUAL_BENCHMARK = visual_benchmark
 
 # Max queries to process (override with `make QMAX=1000 <target>`)
-QMAX ?= 1000
+QMAX ?= 100
 
 # Source files
 MAIN_SRC = src/main.cpp
@@ -140,29 +140,29 @@ rebuild: clean all
 
 # Test targets
 test-lsh-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh_sift.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 4 -R 500.0 -range true -qmax $(QMAX)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh_sift.txt -type sift -lsh -k 10 -L 100 -w 4.0 -N 4 -R 500.0 -range true -qmax $(QMAX)
 
 test-lsh-mnist: $(TARGET)
-	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_lsh_mnist.txt -type mnist -lsh -k 4 -L 5 -w 4.0 -N 4 -R 1500.0 -range true -qmax $(QMAX)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_lsh_mnist.txt -type mnist -lsh -k 10 -L 100 -w 200 -N 4 -R 200 -range true -qmax $(QMAX)
 
 test-hypercube-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube_sift.txt -type sift -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 4 -R 500.0 -range true -qmax $(QMAX)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube_sift.txt -type sift -hypercube -kproj 14 -w 200 -M 20000 -probes 10000 -N 4 -R 500.0 -range true -qmax $(QMAX)
 
 test-hypercube-mnist: $(TARGET)
-	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_hypercube_mnist.txt -type mnist -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 4 -R 1500.0 -range true -qmax $(QMAX)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_hypercube_mnist.txt -type mnist -hypercube -kproj 15 -w 200 -M 20000 -probes 10000 -N 4 -R 200 -range true -qmax $(QMAX)
 
 test-ivfflat-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat_sift.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2.0 -qmax $(QMAX)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat_sift.txt -type sift -ivfflat -kclusters 50 -nprobe 5 -N 4 -R 2.0 -qmax $(QMAX)
 
 test-ivfflat-mnist: $(TARGET)
-	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfflat_mnist.txt -type mnist -ivfflat -kclusters 50 -nprobe 5 -N 1 -R 2000 -qmax $(QMAX)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfflat_mnist.txt -type mnist -ivfflat -kclusters 50 -nprobe 5 -N 4 -R 2000 -qmax $(QMAX)
 
 
 test-ivfpq-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq_sift.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0 -qmax $(QMAX)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq_sift.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 4 -R 2.0 -qmax $(QMAX)
 
 test-ivfpq-mnist: $(TARGET)
-	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfpq_mnist.txt -type mnist -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2000 -qmax $(QMAX)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfpq_mnist.txt -type mnist -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 4 -R 2000 -qmax $(QMAX)
 
 
 

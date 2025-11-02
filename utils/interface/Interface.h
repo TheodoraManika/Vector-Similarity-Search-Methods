@@ -47,11 +47,11 @@ public:
     
     int executeIVFFlat(const std::string& input_file, const std::string& query_file,
                       const std::string& output_file, const std::string& type,
-                      int kclusters, int nprobe, int N, double R, bool range, int seed);
+                                            int kclusters, int nprobe, int N, double R, bool range, int seed, int qmax);
     
     int executeIVFPQ(const std::string& input_file, const std::string& query_file,
                     const std::string& output_file, const std::string& type,
-                    int kclusters, int nprobe, int M, int nbits, int N, double R, bool range, int seed);
+                                        int kclusters, int nprobe, int M, int nbits, int N, double R, bool range, int seed, int qmax);
     
     // Output functions following exact assignment format
     void printSearchResults(std::ofstream& output,

@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <limits>
 #include <list>
-#include <random>
+#include <functional>
 
 // Constructor
 template <typename T>
@@ -77,6 +77,38 @@ int Hypercube<T>::hash_to_hypercube(std::vector<T> vec) {
 }
 
 template <typename T>
+std::vector<uint32_t> Hypercube<T>::neighbors_by_hamming(uint32_t vertex, uint32_t dist) const {
+    std::vector<uint32_t> result;
+    if (dist == 0) {
+        result.push_back(vertex);
+        return result;
+    }
+    if (dist > kproj) return result; // Can't have Hamming distance > kproj bits
+    
+    // Generate all combinations of 'dist' bit positions to flip
+    // Use recursive generation or iterative with bit manipulation
+    std::vector<uint32_t> bit_positions;
+    for (uint32_t i = 0; i < kproj; ++i) {
+        bit_positions.push_back(i);
+    }
+    
+    // Generate all combinations of 'dist' positions from kproj bits
+    std::function<void(uint32_t, uint32_t, uint32_t)> generate_combinations;
+    generate_combinations = [&](uint32_t start, uint32_t chosen, uint32_t mask) {
+        if (chosen == dist) {
+            result.push_back(vertex ^ mask); // Flip the chosen bits
+            return;
+        }
+        for (uint32_t i = start; i <= kproj - (dist - chosen); ++i) {
+            generate_combinations(i + 1, chosen + 1, mask | (1u << i));
+        }
+    };
+    
+    generate_combinations(0, 0, 0);
+    return result;
+}
+
+template <typename T>
 std::pair<int,T> Hypercube<T>::NearestNeighbour(std::vector<T> query_vector) {
     auto lst = kNearestNeighbour(query_vector, 1);
     if (lst.empty()) return {-1, std::numeric_limits<T>::max()};
@@ -133,14 +165,15 @@ std::list<std::pair<int,T>> Hypercube<T>::kNearestNeighbour(std::vector<T> query
     ++probes_checked;
     if (visited_pts >= M || probes_checked >= probes) return result;
 
-    // Step 2..: expand by increasing Hamming distance shells
+    // Step 2: expand by increasing Hamming distance shells using efficient generation
     for (uint32_t shell = 1; probes_checked < probes && visited_pts < M; ++shell) {
-        for (uint32_t b = 0; b < n_buckets; ++b) {
-            if (our_math::hamming_distance(b, static_cast<uint32_t>(q_bucket)) == shell) {
-                scan_bucket(b);
-                ++probes_checked;
-                if (visited_pts >= M || probes_checked >= probes) break;
-            }
+        // Generate only buckets at exact Hamming distance 'shell' from query bucket
+        std::vector<uint32_t> neighbors = neighbors_by_hamming(static_cast<uint32_t>(q_bucket), shell);
+        
+        for (uint32_t neighbor_bucket : neighbors) {
+            if (probes_checked >= probes || visited_pts >= M) break;
+            scan_bucket(neighbor_bucket);
+            ++probes_checked;
         }
     }
 
@@ -170,13 +203,14 @@ std::list<std::pair<int,T>> Hypercube<T>::RangeSearch(std::vector<T> query_vecto
     ++probes_checked;
     if (visited_pts >= M || probes_checked >= probes) return out;
 
+    // Expand by Hamming distance shells using efficient generation
     for (uint32_t shell = 1; probes_checked < probes && visited_pts < M; ++shell) {
-        for (uint32_t b = 0; b < n_buckets; ++b) {
-            if (our_math::hamming_distance(b, static_cast<uint32_t>(q_bucket)) == shell) {
-                collect_bucket(b);
-                ++probes_checked;
-                if (visited_pts >= M || probes_checked >= probes) break;
-            }
+        std::vector<uint32_t> neighbors = neighbors_by_hamming(static_cast<uint32_t>(q_bucket), shell);
+        
+        for (uint32_t neighbor_bucket : neighbors) {
+            if (probes_checked >= probes || visited_pts >= M) break;
+            collect_bucket(neighbor_bucket);
+            ++probes_checked;
         }
     }
     return out;

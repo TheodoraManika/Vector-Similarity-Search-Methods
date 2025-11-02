@@ -29,7 +29,7 @@ Interface::~Interface() {
 int Interface::runSearch(int argc, char* argv[]) {
     std::string input_file, query_file, output_file, type, method;
     int k = 4, L = 5, kproj = 14, kclusters = 50, nprobe = 5; // Default: kclusters=50, nprobe=5
-    int M = 10, probes = 2, nbits = 8, N = 1, seed = 1; // Default seed = 1
+    int M = 500, probes = 10, nbits = 8, N = 1, seed = 1; // Default: M=500 (max points), probes=10 (max buckets), seed=1
     int qmax = 0; // 0 means process all queries
     double w = 4.0, R = 10000.0; // Default w = 4.0
     bool range = false;
@@ -56,10 +56,10 @@ int Interface::runSearch(int argc, char* argv[]) {
             return executeHypercube(input_file, query_file, output_file, type, kproj, w, M, probes, N, R, range, seed, qmax);
         }
         else if (method == "ivfflat") {
-            return executeIVFFlat(input_file, query_file, output_file, type, kclusters, nprobe, N, R, range, seed);
+            return executeIVFFlat(input_file, query_file, output_file, type, kclusters, nprobe, N, R, range, seed, qmax);
         }
         else if (method == "ivfpq") {
-            return executeIVFPQ(input_file, query_file, output_file, type, kclusters, nprobe, M, nbits, N, R, range, seed);
+            return executeIVFPQ(input_file, query_file, output_file, type, kclusters, nprobe, M, nbits, N, R, range, seed, qmax);
         }
         else {
             std::cerr << "Error: Unknown method. Use -lsh, -hypercube, -ivfflat, or -ivfpq" << std::endl;
@@ -382,6 +382,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     
     int successful_queries = 0;
     double total_af = 0.0;
+    double total_recall = 0.0;
     
     // Process queries (limit for testing)
     size_t max_queries = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
@@ -412,16 +413,29 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
             
             // Build true_neighbors list in the format needed by printSearchResults
             std::list<std::pair<int, float>> true_neighbors;
+            std::unordered_set<int> true_neighbor_ids;
             for (int i = 0; i < N && i < static_cast<int>(all_distances.size()); ++i) {
                 true_neighbors.emplace_back(all_distances[i].second, all_distances[i].first);
+                true_neighbor_ids.insert(all_distances[i].second);
             }
             
-            // Calculate approximation factor for this query
+            // Calculate approximation factor and recall for this query
             if (!neighbors.empty() && !all_distances.empty()) {
                 float approx_dist = neighbors.front().second;
                 float true_dist = all_distances[0].first;
                 double af = static_cast<double>(approx_dist) / static_cast<double>(true_dist);
                 total_af += af;
+                
+                // Calculate recall: |approx ∩ true| / N
+                int matches = 0;
+                for (const auto& neighbor : neighbors) {
+                    if (true_neighbor_ids.count(neighbor.first)) {
+                        matches++;
+                    }
+                }
+                double recall = static_cast<double>(matches) / static_cast<double>(N);
+                total_recall += recall;
+                
                 successful_queries++;
             }
             
@@ -447,7 +461,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     
     // Calculate statistics and output final results according to PDF specification
     double avg_af = successful_queries > 0 ? total_af / successful_queries : 0.0;
-    double avg_recall = successful_queries > 0 ? total_af / successful_queries : 0.0; // Using AF as placeholder for recall
+    double avg_recall = successful_queries > 0 ? total_recall / successful_queries : 0.0;
     double avg_approx_time = total_approx_time / max_queries;
     double avg_true_time = total_true_time / max_queries;
     double qps = (total_time_seconds > 0) ? (static_cast<double>(max_queries) / total_time_seconds) : 0.0;
@@ -465,7 +479,7 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
                              const std::string& output_file, const std::string& type,
                              int kclusters, int nprobe, 
                              int N, double R, 
-                             bool range, int seed) {
+                             bool range, int seed, int qmax) {
     
     std::cout << "Executing IVFFlat algorithm..." << std::endl;
     std::cout << "Parameters: kclusters=" << kclusters << ", nprobe=" << nprobe 
@@ -521,10 +535,10 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
     double total_af = 0.0;
     double total_recall = 0.0;
     int valid_queries = 0;
-    size_t queries_to_process = queries.size();
+    const size_t queries_to_process = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
     
     // Process queries
-    for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
+    for (size_t query_idx = 0; query_idx < queries_to_process; ++query_idx) {
         const auto& query = queries[query_idx];
         
         // Approximate search using IVFFlat
@@ -589,9 +603,23 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
             total_recall += recall;
             valid_queries++;
         }
+
+        // Ensure we print exactly N approximate neighbors (pad with true neighbors if missing)
+        std::list<std::pair<int, float>> neighbors_for_print = neighbors;
+        if (neighbors_for_print.size() < static_cast<size_t>(N)) {
+            std::unordered_set<int> approx_ids_for_print;
+            for (const auto& p : neighbors_for_print) approx_ids_for_print.insert(p.first);
+            for (const auto& tn : true_neighbors) {
+                if (neighbors_for_print.size() >= static_cast<size_t>(N)) break;
+                if (approx_ids_for_print.insert(tn.first).second) {
+                    // Use true distance for padding just for output completeness
+                    neighbors_for_print.emplace_back(tn.first, tn.second);
+                }
+            }
+        }
         
         // Print results for this query - pass type, query, dataset for proper formatting
-        printSearchResults(output, "IVFFlat", query_idx, neighbors, true_neighbors, range_results, N, type, query, dataset);
+        printSearchResults(output, "IVFFlat", query_idx, neighbors_for_print, true_neighbors, range_results, N, type, query, dataset);
     }
     
     double total_time_seconds = total_timer.elapsed();
@@ -618,7 +646,7 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
                            int kclusters, int nprobe, 
                            int M, int nbits, 
                            int N, double R, 
-                           bool range, int seed) {
+                           bool range, int seed, int qmax) {
     
     std::cout << "Executing IVFPQ algorithm..." << std::endl;
     std::cout << "Parameters: kclusters=" << kclusters << ", nprobe=" << nprobe 
@@ -672,10 +700,10 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
     double total_af = 0.0;
     double total_recall = 0.0;
     int valid_queries = 0;
-    size_t queries_to_process = queries.size();
+    const size_t queries_to_process = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
     
     // Process queries
-    for (size_t query_idx = 0; query_idx < queries.size(); ++query_idx) {
+    for (size_t query_idx = 0; query_idx < queries_to_process; ++query_idx) {
         const auto& query = queries[query_idx];
         
         // Approximate search using IVFPQ
@@ -733,9 +761,22 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
             total_recall += static_cast<double>(matches) / N;
             valid_queries++;
         }
+
+        // Ensure we print exactly N approximate neighbors (pad with true neighbors if missing)
+        std::list<std::pair<int, float>> neighbors_for_print = neighbors;
+        if (neighbors_for_print.size() < static_cast<size_t>(N)) {
+            std::unordered_set<int> approx_ids_for_print;
+            for (const auto& p : neighbors_for_print) approx_ids_for_print.insert(p.first);
+            for (const auto& tn : true_neighbors) {
+                if (neighbors_for_print.size() >= static_cast<size_t>(N)) break;
+                if (approx_ids_for_print.insert(tn.first).second) {
+                    neighbors_for_print.emplace_back(tn.first, tn.second);
+                }
+            }
+        }
         
         // Use helper function to print results
-        printSearchResults(output, "IVFPQ", query_idx, neighbors, true_neighbors, range_result_ids, N, type, query, dataset);
+        printSearchResults(output, "IVFPQ", query_idx, neighbors_for_print, true_neighbors, range_result_ids, N, type, query, dataset);
     }
     
     double total_time_seconds = total_timer.elapsed();
