@@ -19,8 +19,6 @@
 
 ### Κύρια Αρχεία
 - `src/main.cpp` - Κύριο σημείο εισόδου του προγράμματος (CLI search)
-- `src/comprehensive_benchmark.cpp` - Εκτελέσιμο για πειραματική μελέτη (AF, Recall@N, QPS)
-- `src/visual_benchmark.cpp` - Εκτελέσιμο για visual αναλύσεις και αναφορές
 - `Makefile` - Αρχείο μεταγλώττισης με πολλαπλούς στόχους (search, benchmarks, tests)
 - `README.md` - Αυτό το αρχείο τεκμηρίωσης
 
@@ -40,7 +38,6 @@
 - `interface/Interface.h`, `interface/Interface.cpp` - Κύρια διεπαφή προγράμματος (parsing, εκτέλεση αναζητήσεων)
 - `helpers/Utils.h`, `helpers/Utils.cpp` - Βοηθητικές συναρτήσεις (FileUtils, Stats, Convert) και AutoTimer για μετρήσεις χρόνου
 - `math/math.h`, `math/math.cpp` - Μαθηματικές λειτουργίες και υπολογισμοί
-- `visualization/visualizer.h`, `visualization/visualizer.cpp` - Δημιουργία plots και HTML αναφορών από αποτελέσματα
 
 ### Μετρικές (`metrics/`)
 - `metrics.h`, `metrics.cpp` - Υλοποίηση μετρικών απόστασης
@@ -53,10 +50,10 @@ Algorithms/
 Dataprocessing/
     MNIST/ SIFT/
 utils/
-    interface/ helpers/ math/ visualization/
+    interface/ helpers/ math/
 metrics/
 src/
-    main.cpp comprehensive_benchmark.cpp visual_benchmark.cpp
+    main.cpp
 ```
 
 ## Οδηγίες Μεταγλώττισης
@@ -78,7 +75,7 @@ make clean
 # Rebuild από την αρχή
 make rebuild
 
-# Μεταγλώττιση όλων των εκτελέσιμων (search + benchmarks)
+# Μεταγλώττιση όλων των εκτελέσιμων (search)
 make all-tests
 ```
 
@@ -156,29 +153,21 @@ make all-tests
 ./search -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
 ```
 
-## Benchmarks και Οπτικοποίηση
+## Πειραματική Μελέτη
 
-Υπάρχουν δύο επιπλέον εκτελέσιμα για μελέτες απόδοσης:
-
-- `comprehensive_benchmark` — Τρέχει συγκριτικές δοκιμές (AF, Recall@N, QPS) και χρησιμοποιεί BruteForce για ground-truth και υπολογισμό ταχύτητας/σύγκρισης.
-- `visual_benchmark` — Δημιουργεί CSV, plots και HTML report (στο `results/visualization/`).
-
-Στόχοι Makefile:
+Για αυτόματες δοκιμές και αναφορές, χρησιμοποιήστε τους στόχους πειραματικής μελέτης:
 
 ```bash
-# Μεταγλώττιση όλων των εκτελέσιμων
-make all-tests
+# Εκτέλεση πειραματικής μελέτης (πολλαπλές παραμετροποιήσεις)
+make experimental-study
 
-# Εκτέλεση comprehensive benchmark
-make comprehensive-benchmark
-
-# Εκτέλεση visual benchmark και παραγωγή αναφορών
-make visual-benchmark
+# Ανάλυση αποτελεσμάτων και δημιουργία αναφοράς Markdown/JSON
+make analyze-study
 ```
 
 Σημειώσεις:
-- Οι μετρήσεις χρόνου υλοποιούνται με `Utils::AutoTimer` σε όλα τα benchmarks και στο interface.
-- Το `BruteForce` χρησιμοποιείται για υπολογισμό ακριβών KNN και για σύγκριση χρόνου (speedup vs brute force).
+- Οι μετρήσεις χρόνου υλοποιούνται με `Utils::AutoTimer` στο interface και καταγράφονται στα αποτελέσματα.
+- Το `BruteForce` χρησιμοποιείται για υπολογισμό ακριβών KNN και υπολογισμό AF/Recall@N.
 
 ## Μορφή Εξόδου
 
@@ -248,7 +237,7 @@ QPS: <queries_per_second>
 - **tApproximateAverage**: Μέσος χρόνος προσεγγιστικής αναζήτησης
 - **tTrueAverage**: Μέσος χρόνος ακριβούς αναζήτησης
 
-Στα εκτελέσιμα των benchmarks, επιπλέον παράγονται:
+Στην αναφορά της πειραματικής μελέτης, επιπλέον καταγράφονται:
 - **MeanQueryTimeMS**: Μέσος χρόνος ερωτήματος (ms)
 - **BruteForceTimeMS**: Μέσος χρόνος brute force (ms)
 - **SpeedupVsBruteForce**: Λόγος επιτάχυνσης έναντι brute force

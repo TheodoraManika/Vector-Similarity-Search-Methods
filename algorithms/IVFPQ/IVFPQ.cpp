@@ -26,8 +26,15 @@ ProductQuantizer<T>::~ProductQuantizer() {}
 
 template <typename T>
 void ProductQuantizer<T>::train(const std::vector<std::vector<T>>& training_data) {
+    std::cout << "  Training Product Quantizer (" << M << " subspaces, " 
+              << codebook_size << " centroids each)..." << std::endl;
+    
     // For each subspace, run k-means clustering
     for (uint32_t m = 0; m < M; ++m) {
+        if (m % 4 == 0 || m == M - 1) {
+            std::cout << "    Training subspace " << (m + 1) << "/" << M << "..." << std::flush;
+        }
+        
         // Extract subspace data
         std::vector<std::vector<T>> subspace_data;
         subspace_data.reserve(training_data.size());
@@ -48,7 +55,12 @@ void ProductQuantizer<T>::train(const std::vector<std::vector<T>>& training_data
         for (uint32_t k = 0; k < codebook_size && k < clusters.size(); ++k) {
             codebooks[m][k] = clusters[k].centroid;
         }
+        
+        if (m % 4 == 0 || m == M - 1) {
+            std::cout << " done" << std::endl;
+        }
     }
+    std::cout << "  Product Quantizer training complete" << std::endl;
 }
 
 template <typename T>
@@ -137,9 +149,11 @@ IVFPQ<T>::~IVFPQ() {}
 template <typename T>
 void IVFPQ<T>::train() {
     // Train coarse quantizer
+    std::cout << "  Training coarse quantizer (" << n_clusters << " clusters)..." << std::flush;
     coarse_quantizer->set_data(dataset);
     coarse_quantizer->fit();
     centroids = coarse_quantizer->get_centroids();
+    std::cout << " done" << std::endl;
     
     // Train product quantizer
     product_quantizer->train(dataset);

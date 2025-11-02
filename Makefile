@@ -15,15 +15,14 @@ ALGORITHM_DIR = algorithms
 DATAPROC_DIR = dataprocessing
 UTILS_DIR = utils
 METRICS_DIR = metrics
-VIS_DIR = utils/visualization
+ 
 
 # Object directory (created automatically during compilation)
 OBJ_DIR = obj
 
 # Target executables
 TARGET = search
-COMPREHENSIVE_BENCHMARK = comprehensive_benchmark
-VISUAL_BENCHMARK = visual_benchmark
+ 
 
 # Max queries to process (override with `make QMAX=1000 <target>`)
 QMAX ?= 100
@@ -46,17 +45,15 @@ IVFPQ_SRC = $(ALGORITHM_DIR)/IVFPQ/IVFPQ.cpp
 BRUTEFORCE_SRC = $(ALGORITHM_DIR)/BruteForce/BruteForce.cpp
 
 METRICS_SRC = $(METRICS_DIR)/metrics.cpp
-VIS_SRC = $(VIS_DIR)/visualizer.cpp
+ 
 
 # Test sources
-COMPREHENSIVE_BENCHMARK_SRC = src/comprehensive_benchmark.cpp
-VISUAL_BENCHMARK_SRC = src/visual_benchmark.cpp
 
 # Common library sources (excluding main files)
 LIB_SOURCES = $(INTERFACE_SRC) $(UTILS_SRC) $(MATH_SRC) \
               $(SIFT_SRC) $(MNIST_SRC) $(LSH_SRC) $(HYPERCUBE_SRC) \
               $(KMEANS_SRC) $(IVFFLAT_SRC) $(IVFPQ_SRC) $(BRUTEFORCE_SRC) \
-              $(METRICS_SRC) $(VIS_SRC)
+			  $(METRICS_SRC)
 
 # Main program sources
 MAIN_SOURCES = $(MAIN_SRC) $(LIB_SOURCES)
@@ -64,13 +61,10 @@ MAIN_SOURCES = $(MAIN_SRC) $(LIB_SOURCES)
 # Object files
 MAIN_OBJECTS = $(MAIN_SOURCES:%.cpp=$(OBJ_DIR)/%.o)
 LIB_OBJECTS = $(LIB_SOURCES:%.cpp=$(OBJ_DIR)/%.o)
-COMPREHENSIVE_BENCHMARK_OBJECTS = $(COMPREHENSIVE_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
-VISUAL_BENCHMARK_OBJECTS = $(VISUAL_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.o) $(LIB_OBJECTS)
+ 
 
 # Dependency files
-DEPS = $(MAIN_OBJECTS:.o=.d) $(LIB_OBJECTS:.o=.d) \
-       $(COMPREHENSIVE_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.d) \
-       $(VISUAL_BENCHMARK_SRC:%.cpp=$(OBJ_DIR)/%.d)
+DEPS = $(MAIN_OBJECTS:.o=.d) $(LIB_OBJECTS:.o=.d)
 
 # Dependencies (if they exist)
 -include $(DEPS)
@@ -89,14 +83,13 @@ $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFFlat)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFPQ)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/BruteForce)
 $(shell mkdir -p $(OBJ_DIR)/$(METRICS_DIR))
-$(shell mkdir -p $(OBJ_DIR)/$(VIS_DIR))
 $(shell mkdir -p $(OBJ_DIR)/src)
 
 # Default target
 all: $(TARGET)
 
 # All targets including tests
-all-tests: $(TARGET) $(COMPREHENSIVE_BENCHMARK) $(VISUAL_BENCHMARK)
+all-tests: $(TARGET)
 
 # Release build
 $(TARGET): $(MAIN_OBJECTS)
@@ -104,14 +97,7 @@ $(TARGET): $(MAIN_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
 	@echo "Build completed successfully!"
 
-# Test executables
-$(COMPREHENSIVE_BENCHMARK): $(COMPREHENSIVE_BENCHMARK_OBJECTS)
-	@echo "Linking $(COMPREHENSIVE_BENCHMARK)..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
-
-$(VISUAL_BENCHMARK): $(VISUAL_BENCHMARK_OBJECTS)
-	@echo "Linking $(VISUAL_BENCHMARK)..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $@ $^
+# (no additional test executables)
 
 # Debug build
 debug: CXXFLAGS = $(DEBUG_FLAGS)
@@ -130,9 +116,8 @@ $(OBJ_DIR)/%.o: %.cpp
 clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf $(OBJ_DIR)
-	rm -f $(TARGET) $(COMPREHENSIVE_BENCHMARK) $(VISUAL_BENCHMARK)
+	rm -f $(TARGET)
 	rm -rf tests/*.csv
-	rm -rf results/visualization/
 	@echo "Clean completed!"
 
 # Clean and rebuild
@@ -159,26 +144,14 @@ test-ivfflat-mnist: $(TARGET)
 
 
 test-ivfpq-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq_sift.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 4 -R 2.0 -qmax $(QMAX)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq_sift.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 8 -nbits 8 -N 4 -R 2.0 -qmax $(QMAX)
 
 test-ivfpq-mnist: $(TARGET)
-	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfpq_mnist.txt -type mnist -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 4 -R 2000 -qmax $(QMAX)
+	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfpq_mnist.txt -type mnist -ivfpq -kclusters 50 -nprobe 5 -M 8 -nbits 8 -N 4 -R 2000 -qmax $(QMAX)
 
 
 
-# Comprehensive benchmark with experimental study metrics
-comprehensive-benchmark: $(COMPREHENSIVE_BENCHMARK)
-	@echo "Running comprehensive experimental study as required by PDFs..."
-	@echo "Measuring: Approximation Factor, Recall@N, Queries Per Second"
-	@mkdir -p results tests
-	./$(COMPREHENSIVE_BENCHMARK)
-
-# Visual benchmark with parameter sweeps and comprehensive visualization
-visual-benchmark: $(VISUAL_BENCHMARK)
-	@echo "Running comprehensive visual benchmark with parameter analysis..."
-	@echo "Generating plots, parameter impact analysis, and HTML reports"
-	@mkdir -p results/visualization
-	./$(VISUAL_BENCHMARK)
+# (comprehensive and visual benchmarks removed per project cleanup)
 
 # Help target
 help:
@@ -188,8 +161,8 @@ help:
 	@echo "  debug              - Build with debug flags"
 	@echo "  clean              - Remove build artifacts and results"
 	@echo "  rebuild            - Clean and build (forces full recompilation)"
-	@echo "  comprehensive-benchmark - Run PDF-required experimental study (AF, Recall@N, QPS)"
-	@echo "  visual-benchmark   - Run comprehensive visual analysis with parameter sweeps"
+	@echo "  experimental-study - Run full experimental comparative study (PDF requirement)"
+	@echo "  analyze-study      - Analyze experimental study results and generate report"
 	@echo "  test-lsh-sift      - Test LSH algorithm with SIFT dataset"
 	@echo "  test-lsh-mnist     - Test LSH algorithm with MNIST dataset"
 	@echo "  test-hypercube-sift     - Test Hypercube algorithm with SIFT dataset"
@@ -199,9 +172,21 @@ help:
 	@echo "  test-ivfpq-sift    - Test IVFPQ algorithm with SIFT dataset"
 	@echo "  test-ivfpq-mnist   - Test IVFPQ algorithm with MNIST dataset"
 	@echo "  install            - Install to /usr/local/bin"
+
+# Experimental Study Targets
+experimental-study: $(TARGET)
+	@echo "Running Experimental Comparative Study..."
+	@./run_experimental_study.sh
+
+analyze-study:
+	@echo "Analyzing Experimental Study Results..."
+	@python3 analyze_experimental_study.py
+	@echo ""
+	@echo "Report generated: results/EXPERIMENTAL_STUDY_REPORT.md"
 	
 # Phony targets
-.PHONY: all all-tests debug clean rebuild install comprehensive-benchmark visual-benchmark docs help
+.PHONY: all all-tests debug clean rebuild install docs help
+.PHONY: experimental-study analyze-study
 .PHONY: test-lsh test-lsh-sift test-lsh-mnist test-hypercube test-hypercube-sift test-hypercube-mnist
 .PHONY: test-ivfflat test-ivfflat-sift test-ivfflat-mnist test-ivfpq test-ivfpq-sift test-ivfpq-mnist
 
