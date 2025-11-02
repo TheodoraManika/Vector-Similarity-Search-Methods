@@ -46,6 +46,4 @@ To do Myrto:
 - [ ] sift output 
 - [✓] check input and output for ivfflat and ivfpq because they do not generate output files
 - [✓] do the same that you did for kmeans for ivfflat 
-- [ ] try to run for different values 
-- [ ] see why recall n is 0 for lsh and hypercube  in comprehensive testing
 - [ ] !!!when we are done, we need to change the maybe unused clauses for the manually given parameters
