@@ -43,7 +43,7 @@ To do Myrto:
 - [✓] δες τις διαφάνειες και κάθε γράμμη κώδικα αν γίνονται όλα όσα ζητάει ή αν γίνονται οι σωστές πράξεις ή με τη σωστή σειρά
 - [✓] γιατί το lsh δνε βγάζει 4 γειτονικούς γείτονες και δεν εμφανίζει και το range search για το sift και mnist
 - [✓] κάνε την ίδια διαδικασία για kmeans
-- [ ] sift output 
+- [✓] sift output 
 - [✓] check input and output for ivfflat and ivfpq because they do not generate output files
 - [✓] do the same that you did for kmeans for ivfflat 
 - [✓] theory check for ivfpq

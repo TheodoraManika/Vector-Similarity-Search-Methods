@@ -125,13 +125,13 @@ rebuild: clean all
 
 # Test targets
 test-lsh-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh_sift.txt -type sift -lsh -k 10 -L 100 -w 4.0 -N 4 -R 500.0 -range true -qmax $(QMAX)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh_sift.txt -type sift -lsh -k 10 -L 100 -w 4.0 -N 4 -R 300.0 -range true -qmax $(QMAX)
 
 test-lsh-mnist: $(TARGET)
 	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_lsh_mnist.txt -type mnist -lsh -k 10 -L 100 -w 200 -N 4 -R 200 -range true -qmax $(QMAX)
 
 test-hypercube-sift: $(TARGET)
-	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube_sift.txt -type sift -hypercube -kproj 14 -w 200 -M 20000 -probes 10000 -N 4 -R 500.0 -range true -qmax $(QMAX)
+	./$(TARGET) -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_hypercube_sift.txt -type sift -hypercube -kproj 14 -w 200 -M 20000 -probes 10000 -N 4 -R 300.0 -range true -qmax $(QMAX)
 
 test-hypercube-mnist: $(TARGET)
 	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_hypercube_mnist.txt -type mnist -hypercube -kproj 15 -w 200 -M 20000 -probes 10000 -N 4 -R 200 -range true -qmax $(QMAX)
