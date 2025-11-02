@@ -191,18 +191,75 @@ make help                   # Εμφάνιση όλων των διαθέσιμ�
 
 ### Παραδείγματα Χρήσης
 
+#### LSH με SIFT
 ```bash
-# LSH με SIFT δεδομένα
-./search -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_lsh.txt -type sift -lsh -k 4 -L 5 -w 4.0 -N 1 -R 2.0
+# Βασική εκτέλεση με 10 πλησιέστερους γείτονες
+./search -d Dataset/sift/siftsmall_base.fvecs -q Dataset/sift/siftsmall_query.fvecs \
+         -o results/lsh_sift_output.txt -type sift -lsh -k 4 -L 5 -N 10
 
-# Hypercube με MNIST δεδομένα
-./search -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_hypercube.txt -type mnist -hypercube -kproj 14 -w 4.0 -M 10 -probes 2 -N 5 -R 2000 -range true
+# Με range search και αυτόματο υπολογισμό w
+./search -d Dataset/sift/siftsmall_base.fvecs -q Dataset/sift/siftsmall_query.fvecs \
+         -o results/lsh_sift_range.txt -type sift -lsh -k 4 -L 5 -N 10 -R 300 \
+         -range true -auto_w true
 
-# IVFFlat με optimized clusters
-./search -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfflat.txt -type sift -ivfflat -kclusters 100 -nprobe 10 -N 10 -R 2.0 -seed 42
+# Περιορισμός επεξεργασίας σε 100 queries
+QMAX=100 ./search -d Dataset/sift/siftsmall_base.fvecs \
+         -q Dataset/sift/siftsmall_query.fvecs -o results/lsh_quick.txt \
+         -type sift -lsh -k 4 -L 5 -N 5 -qmax 100
+```
 
-# IVFPQ με υψηλή συμπίεση
-./search -d dataset/sift_learn.fvecs -q dataset/sift_query.fvecs -o results/output_ivfpq.txt -type sift -ivfpq -kclusters 50 -nprobe 5 -M 16 -nbits 8 -N 1 -R 2.0
+#### Hypercube με MNIST
+```bash
+# Βασική εκτέλεση με 5 πλησιέστερους γείτονες
+./search -d Dataset/mnist/train-images-idx3-ubyte \
+         -q Dataset/mnist/t10k-images-idx3-ubyte \
+         -o results/hypercube_mnist.txt -type mnist -hypercube \
+         -kproj 14 -M 500 -probes 10 -N 5
+
+# Με range search
+./search -d Dataset/mnist/train-images-idx3-ubyte \
+         -q Dataset/mnist/t10k-images-idx3-ubyte \
+         -o results/hypercube_range.txt -type mnist -hypercube \
+         -kproj 14 -M 500 -probes 10 -N 5 -R 200 -range true
+```
+
+#### IVFFlat με SIFT
+```bash
+# 50 clusters, έλεγχος top-5 clusters
+./search -d Dataset/sift/siftsmall_base.fvecs \
+         -q Dataset/sift/siftsmall_query.fvecs \
+         -o results/ivfflat_sift.txt -type sift -ivfflat \
+         -kclusters 50 -nprobe 5 -N 10 -R 300 -range true
+```
+
+#### IVFPQ με MNIST
+```bash
+# Product Quantization με M=500 subquantizers
+./search -d Dataset/mnist/train-images-idx3-ubyte \
+         -q Dataset/mnist/t10k-images-idx3-ubyte \
+         -o results/ivfpq_mnist.txt -type mnist -ivfpq \
+         -kclusters 50 -nprobe 5 -M 500 -nbits 8 -N 10
+
+# Με custom seed για reproducible results
+./search -d Dataset/mnist/train-images-idx3-ubyte \
+         -q Dataset/mnist/t10k-images-idx3-ubyte \
+         -o results/ivfpq_seed42.txt -type mnist -ivfpq \
+         -kclusters 50 -nprobe 5 -M 500 -nbits 8 -N 10 -seed 42
+```
+
+#### Εκτέλεση με Make Targets
+```bash
+# Γρήγορα single tests
+make test-lsh-sift          # LSH με SIFT dataset
+make test-hypercube-mnist   # Hypercube με MNIST dataset
+make test-ivfflat-sift      # IVFFlat με SIFT dataset
+make test-ivfpq-mnist       # IVFPQ με MNIST dataset
+
+# Comprehensive experimental study (~75 configurations)
+make report-tests           # Runs run_expiramental_study.sh and analyzer
+# Ή ξεχωριστά:
+QMAX=100 ./run_expiramental_study.sh  # Limit to 100 queries per test
+python3 analyze_expiramental_study.py  # Generate summary reports
 ```
 
 ## Πειραματική Μελέτη
@@ -210,16 +267,29 @@ make help                   # Εμφάνιση όλων των διαθέσιμ�
 Για αυτόματες δοκιμές και αναφορές, χρησιμοποιήστε τους στόχους πειραματικής μελέτης:
 
 ```bash
-# Εκτέλεση πειραματικής μελέτης (πολλαπλές παραμετροποιήσεις)
-make experimental-study
+# Εκτέλεση πλήρους πειραματικής μελέτης (~75 configurations)
+make report-tests
+# Αυτό εκτελεί: ./run_expiramental_study.sh && python3 analyze_expiramental_study.py
 
-# Ανάλυση αποτελεσμάτων και δημιουργία αναφοράς Markdown/JSON
-make analyze-study
+# Ή ξεχωριστά με περιορισμό queries:
+QMAX=100 ./run_expiramental_study.sh    # Εκτέλεση tests με max 100 queries ανά config
+python3 analyze_expiramental_study.py   # Δημιουργία markdown/JSON reports
+
+# Επιμέρους targets:
+make experimental-study     # Μόνο εκτέλεση tests
+make analyze-study         # Μόνο ανάλυση αποτελεσμάτων
 ```
 
-Σημειώσεις:
+**Αποτελέσματα:**
+- Τα αποτελέσματα αποθηκεύονται σε `results/report_tests/<algorithm>/<config>.txt`
+- Οι συγκεντρωτικές αναφορές δημιουργούνται ως:
+  - `results/REPORT_TESTS_SUMMARY.md` (Markdown tables)
+  - `results/REPORT_TESTS_SUMMARY.json` (JSON format)
+
+**Σημειώσεις:**
 - Οι μετρήσεις χρόνου υλοποιούνται με `Utils::AutoTimer` στο interface και καταγράφονται στα αποτελέσματα.
 - Το `BruteForce` χρησιμοποιείται για υπολογισμό ακριβών KNN και υπολογισμό AF/Recall@N.
+- Η πλήρης πειραματική μελέτη ελέγχει πολλαπλές παραμετροποιήσεις για κάθε αλγόριθμο με MNIST και SIFT datasets.
 
 ## Μορφή Εξόδου
 
@@ -283,16 +353,44 @@ QPS: <queries_per_second>
 
 Το πρόγραμμα υπολογίζει και αναφέρει:
 
-- **Approximation Factor (AF)**: Λόγος προσεγγιστικής προς ακριβή απόσταση
-- **Recall@N**: Ποσοστό ορθών αποτελεσμάτων στους N πλησιέστερους
-- **QPS (Queries Per Second)**: Ταχύτητα επεξεργασίας ερωτημάτων
-- **tApproximateAverage**: Μέσος χρόνος προσεγγιστικής αναζήτησης
-- **tTrueAverage**: Μέσος χρόνος ακριβούς αναζήτησης
+### Βασικές Μετρικές
+- **Approximation Factor (AF)**: Λόγος προσεγγιστικής προς ακριβή απόσταση (`approx_dist / true_dist`)
+  - Υπολογίζεται για κάθε query με μη-κενά αποτελέσματα
+  - Μέσος όρος αναφέρεται ως Average AF
+  - Ιδανικά πλησιάζει το 1.0 (τέλεια προσέγγιση)
 
-Στην αναφορά της πειραματικής μελέτης, επιπλέον καταγράφονται:
-- **MeanQueryTimeMS**: Μέσος χρόνος ερωτήματος (ms)
-- **BruteForceTimeMS**: Μέσος χρόνος brute force (ms)
-- **SpeedupVsBruteForce**: Λόγος επιτάχυνσης έναντι brute force
+- **Recall@N**: Ποσοστό ορθών αποτελεσμάτων στους N πλησιέστερους γείτονες
+  - Υπολογίζεται ως `|approximate_neighbors ∩ true_neighbors| / N`
+  - Μέσος όρος αναφέρεται ως Average Recall@N
+  - Εύρος: [0, 1], όπου 1.0 σημαίνει όλα τα αποτελέσματα είναι ορθά
+
+- **QPS (Queries Per Second)**: Ταχύτητα επεξεργασίας ερωτημάτων
+  - Υπολογίζεται ως `total_queries / total_time`
+  - Υψηλότερο QPS = καλύτερη απόδοση
+
+### Χρονικές Μετρικές
+- **tApproximateAverage**: Μέσος χρόνος προσεγγιστικής αναζήτησης ανά query (ms)
+- **tTrueAverage**: Μέσος χρόνος ακριβούς αναζήτησης (brute force) ανά query (ms)
+- **MeanQueryTimeMS**: Μέσος χρόνος ερωτήματος (ms) - στις αναφορές πειραματικής μελέτης
+- **BruteForceTimeMS**: Μέσος χρόνος brute force (ms) - στις αναφορές πειραματικής μελέτης
+- **SpeedupVsBruteForce**: Λόγος επιτάχυνσης έναντι brute force (`brute_force_time / approx_time`)
+
+### Σημαντικές Σημειώσεις
+- **Έγκυρα Queries**: Μόνο queries με μη-κενά αποτελέσματα (από τον προσεγγιστικό αλγόριθμο και το brute force) συμμετέχουν στον υπολογισμό μέσων όρων AF και Recall@N
+- **Brute Force Baseline**: Το `BruteForce` χρησιμοποιείται για υπολογισμό ακριβών KNN (ground truth) για τον υπολογισμό AF/Recall
+- **Range Search**: Οι μετρικές range search αναφέρουν τον αριθμό γειτόνων εντός ακτίνας R
+- **Timing**: Χρησιμοποιείται `Utils::AutoTimer` για ακριβείς μετρήσεις χρόνου με RAII pattern
+
+### Ερμηνεία Αποτελεσμάτων
+**Καλή Απόδοση:**
+- AF κοντά στο 1.0 (π.χ., 1.0-1.2)
+- Recall@N > 0.8 (80%+ ορθά αποτελέσματα)
+- QPS >> Brute Force QPS
+- Speedup > 10x
+
+**Trade-offs:**
+- Υψηλότερη ακρίβεια (AF↓, Recall↑) συνήθως μειώνει την ταχύτητα (QPS↓)
+- Ρυθμίσεις παραμέτρων: περισσότερα hash tables/probes/clusters → καλύτερη ακρίβεια, χειρότερη ταχύτητα
 
 ## Στοιχεία Ανάπτυξης
 
