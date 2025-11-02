@@ -42,31 +42,49 @@
 ### Μετρικές (`metrics/`)
 - `metrics.h`, `metrics.cpp` - Υλοποίηση μετρικών απόστασης
 
-## Δομή Project (σύνοψη)
+## Δομή Project
 
 ```
-Algorithms/
-    LSH/ IVFFlat/ IVFPQ/ Hypercube/ Kmeans/ BruteForce/
-Dataprocessing/
-    MNIST/ SIFT/
-utils/
-    interface/ helpers/ math/
-metrics/
-src/
-    main.cpp
+Vector-Similarity-Search-Methods/
+├── algorithms/              # Υλοποιήσεις αλγορίθμων
+│   ├── LSH/                # Locality Sensitive Hashing
+│   ├── hypercube/          # Random Projection Hypercube
+│   ├── IVFFlat/            # Inverted File Flat Index
+│   ├── IVFPQ/              # Inverted File Product Quantization
+│   ├── Kmeans/             # K-means clustering
+│   └── BruteForce/         # Ακριβής αναζήτηση (ground truth)
+├── dataprocessing/         # Dataset parsers
+│   ├── MNIST/              # MNIST image parser
+│   └── SIFT/               # SIFT vector parser
+├── utils/                  # Βοηθητικά εργαλεία
+│   ├── interface/          # CLI interface και orchestration
+│   ├── helpers/            # Utils, FileUtils, AutoTimer
+│   └── math/               # Μαθηματικές συναρτήσεις
+├── metrics/                # Distance metrics (L2, Manhattan)
+├── src/                    # Κύριο πρόγραμμα
+│   └── main.cpp           # Entry point
+├── dataset/                # Datasets (MNIST, SIFT)
+├── results/                # Αποτελέσματα αναζητήσεων
+├── obj/                    # Build artifacts (auto-generated)
+├── run_expiramental_study.sh    # Script για πειραματική μελέτη
+├── analyze_expiramental_study.py # Ανάλυση αποτελεσμάτων
+├── Makefile               # Build configuration
+└── README.md              # Αυτό το αρχείο
 ```
 
 ## Οδηγίες Μεταγλώττισης
 
 ### Προαπαιτούμενα
 - Compiler C++17 ή νεότερος (g++ 7+ ή clang++ 5+)
+- Python 3.x (για scripts ανάλυσης)
+- Make
 
 ### Μεταγλώττιση
 ```bash
-# Κανονική μεταγλώττιση (optimized)
+# Κανονική μεταγλώττιση (optimized, -O3)
 make
 
-# Debug μεταγλώττιση
+# Debug μεταγλώττιση με symbols
 make debug
 
 # Καθαρισμός αρχείων μεταγλώττισης
@@ -74,9 +92,30 @@ make clean
 
 # Rebuild από την αρχή
 make rebuild
+```
 
-# Μεταγλώττιση όλων των εκτελέσιμων (search)
-make all-tests
+### Διαθέσιμοι Στόχοι Make
+```bash
+make all              # Μεταγλώττιση του search executable
+make debug            # Debug build με -g
+make clean            # Καθαρισμός build artifacts
+make rebuild          # Clean + build
+
+# Γρήγορες δοκιμές ανά αλγόριθμο
+make test-lsh-sift
+make test-lsh-mnist
+make test-hypercube-sift
+make test-hypercube-mnist
+make test-ivfflat-sift
+make test-ivfflat-mnist
+make test-ivfpq-sift
+make test-ivfpq-mnist
+
+# Πειραματικές μελέτες
+make experimental-study      # Εκτέλεση full experimental study
+make analyze-study          # Ανάλυση αποτελεσμάτων
+
+make help                   # Εμφάνιση όλων των διαθέσιμων targets
 ```
 
 ## Οδηγίες Χρήσης
@@ -88,53 +127,66 @@ make all-tests
 
 ### Παράμετροι Αλγορίθμων
 
+#### Κοινές Παράμετροι
+- `-d <file>`: Input dataset file (required)
+- `-q <file>`: Query file (required)
+- `-o <file>`: Output file (required)
+- `-type <mnist|sift>`: Dataset type (required)
+- `-N <int>`: Αριθμός πλησιέστερων γειτόνων (default: 1)
+- `-R <double>`: Ακτίνα για range search (default: 2000 για MNIST, 2.0 για SIFT)
+- `-range <true|false>`: Ενεργοποίηση range search (default: false)
+- `-qmax <int>`: Μέγιστος αριθμός queries προς επεξεργασία, 0=όλα (default: 0)
+- `-seed <int>`: Random seed (default: 1)
+
 #### LSH
 ```bash
 ./search -d input.dat -q query.dat -o output.txt -type sift -lsh \
-         -k <int> -L <int> -w <double> -N <int> -R <double> -range <true|false>
+         -k <int> -L <int> -w <double> -N <int> -R <double> -range <true|false> \
+         -qmax <int> -auto_w <true|false>
 ```
 
 **Παράμετροι:**
-- `-k <int>`: Αριθμός LSH συναρτήσεων (default: 4)
-- `-L <int>`: Αριθμός πινάκων κατακερματισμού (default: 5)
+- `-k <int>`: Αριθμός hash functions ανά table (default: 4)
+- `-L <int>`: Αριθμός hash tables (default: 5)
 - `-w <double>`: Μήκος κελιού προβολής (default: 4.0)
-- `-N <int>`: Αριθμός πλησιέστερων γειτόνων (default: 1)
-- `-R <double>`: Ακτίνα αναζήτησης (default: 2000 για MNIST, 2 για SIFT)
-- `-range <true|false>`: Ενεργοποίηση αναζήτησης περιοχής
+- `-auto_w <true|false>`: Αυτόματος υπολογισμός w από δεδομένα (default: false)
 
 #### Hypercube
 ```bash
 ./search -d input.dat -q query.dat -o output.txt -type sift -hypercube \
-         -kproj <int> -w <double> -M <int> -probes <int> -N <int> -R <double> -range <true|false>
+         -kproj <int> -w <double> -M <int> -probes <int> -N <int> -R <double> \
+         -range <true|false> -qmax <int> -auto_w <true|false>
 ```
 
 **Παράμετροι:**
 - `-kproj <int>`: Διάσταση προβολής (default: 14)
 - `-w <double>`: Μήκος κελιού προβολής (default: 4.0)
-- `-M <int>`: Μέγιστος αριθμός υποψήφιων (default: 10)
-- `-probes <int>`: Μέγιστος αριθμός probes (default: 2)
+- `-M <int>`: Μέγιστος αριθμός υποψήφιων προς έλεγχο (default: 500)
+- `-probes <int>`: Μέγιστος αριθμός vertices προς έλεγχο (default: 10)
+- `-auto_w <true|false>`: Αυτόματος υπολογισμός w από δεδομένα (default: false)
 
 #### IVFFlat
 ```bash
 ./search -d input.dat -q query.dat -o output.txt -type sift -ivfflat \
-         -kclusters <int> -nprobe <int> -N <int> -R <double> -range <true|false> -seed <int>
+         -kclusters <int> -nprobe <int> -N <int> -R <double> -range <true|false> \
+         -seed <int> -qmax <int>
 ```
 
 **Παράμετροι:**
-- `-kclusters <int>`: Αριθμός clusters (default: 50)
-- `-nprobe <int>`: Αριθμός clusters προς έλεγχο (default: 5)
-- `-seed <int>`: Seed για random generator (default: 1)
+- `-kclusters <int>`: Αριθμός clusters k-means (default: 50)
+- `-nprobe <int>`: Αριθμός clusters προς έλεγχο κατά search (default: 5)
 
 #### IVFPQ
 ```bash
 ./search -d input.dat -q query.dat -o output.txt -type sift -ivfpq \
-         -kclusters <int> -nprobe <int> -M <int> -nbits <int> -N <int> -R <double> -range <true|false> -seed <int>
+         -kclusters <int> -nprobe <int> -M <int> -nbits <int> -N <int> -R <double> \
+         -range <true|false> -seed <int> -qmax <int>
 ```
 
 **Παράμετροι:**
-- `-kclusters <int>`: Αριθμός clusters (default: 50)
-- `-nprobe <int>`: Αριθμός clusters προς έλεγχο (default: 5)
-- `-M <int>`: Αριθμός υποδιανυσμάτων για PQ (default: 16)
+- `-kclusters <int>`: Αριθμός clusters k-means (default: 50)
+- `-nprobe <int>`: Αριθμός clusters προς έλεγχο κατά search (default: 5)
+- `-M <int>`: Αριθμός subquantizers για Product Quantization (default: 500)
 - `-nbits <int>`: Bits ανά subquantizer (default: 8)
 
 ### Παραδείγματα Χρήσης

@@ -149,9 +149,18 @@ test-ivfpq-sift: $(TARGET)
 test-ivfpq-mnist: $(TARGET)
 	./$(TARGET) -d dataset/train-images.idx3-ubyte -q dataset/t10k-images.idx3-ubyte -o results/output_ivfpq_mnist.txt -type mnist -ivfpq -kclusters 50 -nprobe 5 -M 8 -nbits 8 -N 4 -R 2000 -qmax $(QMAX)
 
+# Experimental Study Targets
+analyze-study:
+	@echo "Analyzing Experimental Study Results..."
+	@python3 analyze_experimental_study.py
+	@echo ""
+	@echo "Report generated: results/EXPERIMENTAL_STUDY_REPORT.md"
 
+experimental-study: $(TARGET)
+	@echo "Running full experimental study..."
+	@chmod +x run_expiramental_study.sh
+	@./run_expiramental_study.sh
 
-# (comprehensive and visual benchmarks removed per project cleanup)
 
 # Help target
 help:
@@ -161,7 +170,7 @@ help:
 	@echo "  debug              - Build with debug flags"
 	@echo "  clean              - Remove build artifacts and results"
 	@echo "  rebuild            - Clean and build (forces full recompilation)"
-	@echo "  experimental-study - Run full experimental comparative study (PDF requirement)"
+	@echo "  experimental-study - Run full experimental comparative study "
 	@echo "  analyze-study      - Analyze experimental study results and generate report"
 	@echo "  test-lsh-sift      - Test LSH algorithm with SIFT dataset"
 	@echo "  test-lsh-mnist     - Test LSH algorithm with MNIST dataset"
@@ -171,22 +180,10 @@ help:
 	@echo "  test-ivfflat-mnist - Test IVFFlat algorithm with MNIST dataset"
 	@echo "  test-ivfpq-sift    - Test IVFPQ algorithm with SIFT dataset"
 	@echo "  test-ivfpq-mnist   - Test IVFPQ algorithm with MNIST dataset"
-	@echo "  install            - Install to /usr/local/bin"
 
-# Experimental Study Targets
-experimental-study: $(TARGET)
-	@echo "Running Experimental Comparative Study..."
-	@./run_experimental_study.sh
-
-analyze-study:
-	@echo "Analyzing Experimental Study Results..."
-	@python3 analyze_experimental_study.py
-	@echo ""
-	@echo "Report generated: results/EXPERIMENTAL_STUDY_REPORT.md"
-	
 # Phony targets
 .PHONY: all all-tests debug clean rebuild install docs help
-.PHONY: experimental-study analyze-study
+.PHONY: experimental-study analyze-study report-tests
 .PHONY: test-lsh test-lsh-sift test-lsh-mnist test-hypercube test-hypercube-sift test-hypercube-mnist
 .PHONY: test-ivfflat test-ivfflat-sift test-ivfflat-mnist test-ivfpq test-ivfpq-sift test-ivfpq-mnist
 
