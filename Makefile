@@ -42,7 +42,6 @@ HYPERCUBE_SRC = $(ALGORITHM_DIR)/hypercube/Hypercube.cpp
 KMEANS_SRC = $(ALGORITHM_DIR)/Kmeans/kmeans.cpp
 IVFFLAT_SRC = $(ALGORITHM_DIR)/IVFFlat/IVFFlat.cpp
 IVFPQ_SRC = $(ALGORITHM_DIR)/IVFPQ/IVFPQ.cpp
-BRUTEFORCE_SRC = $(ALGORITHM_DIR)/BruteForce/BruteForce.cpp
 
 METRICS_SRC = $(METRICS_DIR)/metrics.cpp
  
@@ -52,7 +51,7 @@ METRICS_SRC = $(METRICS_DIR)/metrics.cpp
 # Common library sources (excluding main files)
 LIB_SOURCES = $(INTERFACE_SRC) $(UTILS_SRC) $(MATH_SRC) \
               $(SIFT_SRC) $(MNIST_SRC) $(LSH_SRC) $(HYPERCUBE_SRC) \
-              $(KMEANS_SRC) $(IVFFLAT_SRC) $(IVFPQ_SRC) $(BRUTEFORCE_SRC) \
+              $(KMEANS_SRC) $(IVFFLAT_SRC) $(IVFPQ_SRC) \
 			  $(METRICS_SRC)
 
 # Main program sources
@@ -81,7 +80,6 @@ $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/hypercube)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/Kmeans)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFFlat)
 $(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/IVFPQ)
-$(shell mkdir -p $(OBJ_DIR)/$(ALGORITHM_DIR)/BruteForce)
 $(shell mkdir -p $(OBJ_DIR)/$(METRICS_DIR))
 $(shell mkdir -p $(OBJ_DIR)/src)
 
