@@ -244,7 +244,7 @@ if [[ -f "$MNIST_TRAIN" && -f "$MNIST_QUERY" ]]; then
   )
   for entry in "${COMBOS[@]}"; do
     read KCL NPRO M NB <<<"$entry"
-    run_parallel_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/ivfpq/mnist_k${KCL}_p${NPRO}_M${M}_nbits${NB}_N5.txt" -type mnist -ivfpq -kclusters ${KCL} -nprobe ${NPRO} -M ${M} -nbits ${NB} -N 5 -R 500 -range true -qmax $QMAX
+    run ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/ivfpq/mnist_k${KCL}_p${NPRO}_M${M}_nbits${NB}_N5.txt" -type mnist -ivfpq -kclusters ${KCL} -nprobe ${NPRO} -M ${M} -nbits ${NB} -N 5 -R 500 -range true -qmax $QMAX
   done
 else
   echo "[WARN] MNIST files not found — skipping IVFPQ MNIST"

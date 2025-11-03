@@ -289,7 +289,14 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             
-            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
+            // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
+            // use the second neighbor for AF calculation
+            if (true_dist == 0.0f && true_neighbors.size() > 1) {
+                auto it = std::next(true_neighbors.begin());
+                true_dist = it->second;
+            }
+            
+            // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
             if (true_dist > 0) {
                 query_af = approx_dist / true_dist;
                 total_af += query_af;
@@ -447,7 +454,13 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
                 float approx_dist = neighbors.front().second;
                 float true_dist = all_distances[0].first;
                 
-                // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
+                // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
+                // use the second neighbor for AF calculation
+                if (true_dist == 0.0f && all_distances.size() > 1) {
+                    true_dist = all_distances[1].first;
+                }
+                
+                // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
                 if (true_dist > 0) {
                     double af = static_cast<double>(approx_dist) / static_cast<double>(true_dist);
                     total_af += af;
@@ -621,7 +634,14 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             
-            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
+            // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
+            // use the second neighbor for AF calculation
+            if (true_dist == 0.0f && true_neighbors.size() > 1) {
+                auto it = std::next(true_neighbors.begin());
+                true_dist = it->second;
+            }
+            
+            // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
             if (true_dist > 0) {
                 double af = approx_dist / true_dist;
                 total_af += af;
@@ -814,7 +834,14 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             
-            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
+            // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
+            // use the second neighbor for AF calculation
+            if (true_dist == 0.0f && true_neighbors.size() > 1) {
+                auto it = std::next(true_neighbors.begin());
+                true_dist = it->second;
+            }
+            
+            // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
             if (true_dist > 0) {
                 float af = approx_dist / true_dist;
                 total_af += af;
