@@ -2,8 +2,8 @@
 # C++17 standard required for proper functionality
 
 CXX = g++
-CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -DNDEBUG -march=native
-DEBUG_FLAGS = -std=c++17 -Wall -Wextra -g -DDEBUG
+CXXFLAGS = -std=c++17 -Wall -Wextra -O3 -DNDEBUG -march=native -fopenmp
+DEBUG_FLAGS = -std=c++17 -Wall -Wextra -g -DDEBUG -fopenmp
 INCLUDES = -I.
 
 # Dependency generation flags

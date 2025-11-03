@@ -28,6 +28,7 @@ To do Theodora:
 - [✓] add range parameter 300 for sift and 200 for mnist to report tests and remove 1 neighbor tests
 - [ ] remove unwanted and unsused files and functions
 - [✓] update readme with new running instructions
+- [✓] add parallelization in ivfpq
 - [✓] try many parameters
 - [ ] add better commets where needed
  

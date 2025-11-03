@@ -4,6 +4,7 @@
 #include <cmath>
 #include <queue>
 #include <unordered_set>
+#include <omp.h>
 
 // ProductQuantizer implementation
 template <typename T>
@@ -29,10 +30,15 @@ void ProductQuantizer<T>::train(const std::vector<std::vector<T>>& training_data
     std::cout << "  Training Product Quantizer (" << M << " subspaces, " 
               << codebook_size << " centroids each)..." << std::endl;
     
-    // For each subspace, run k-means clustering
+    // Parallelize k-means training across subspaces
+    #pragma omp parallel for schedule(dynamic)
     for (uint32_t m = 0; m < M; ++m) {
-        if (m % 4 == 0 || m == M - 1) {
-            std::cout << "    Training subspace " << (m + 1) << "/" << M << "..." << std::flush;
+        #pragma omp critical
+        {
+            if (m % 4 == 0 || m == M - 1) {
+                std::cout << "    Training subspace " << (m + 1) << "/" << M 
+                          << " (thread " << omp_get_thread_num() << ")..." << std::flush;
+            }
         }
         
         // Extract subspace data
@@ -56,8 +62,11 @@ void ProductQuantizer<T>::train(const std::vector<std::vector<T>>& training_data
             codebooks[m][k] = clusters[k].centroid;
         }
         
-        if (m % 4 == 0 || m == M - 1) {
-            std::cout << " done" << std::endl;
+        #pragma omp critical
+        {
+            if (m % 4 == 0 || m == M - 1) {
+                std::cout << " done" << std::endl;
+            }
         }
     }
     std::cout << "  Product Quantizer training complete" << std::endl;
@@ -67,6 +76,8 @@ template <typename T>
 std::vector<uint8_t> ProductQuantizer<T>::encode(const std::vector<T>& vector) const {
     std::vector<uint8_t> codes(M);
     
+    // Parallelize encoding across subspaces
+    #pragma omp parallel for schedule(static)
     for (uint32_t m = 0; m < M; ++m) {
         T min_dist = std::numeric_limits<T>::max();
         uint8_t best_code = 0;
@@ -107,6 +118,8 @@ template <typename T>
 std::vector<std::vector<T>> ProductQuantizer<T>::compute_distance_table(const std::vector<T>& query) const {
     std::vector<std::vector<T>> distance_table(M);
     
+    // Parallelize distance table computation across subspaces
+    #pragma omp parallel for schedule(static)
     for (uint32_t m = 0; m < M; ++m) {
         distance_table[m].resize(codebook_size);
         
@@ -349,13 +362,14 @@ std::list<std::pair<int, T>> IVFPQ<T>::range_search(const std::vector<T>& query,
 template <typename T>
 std::vector<int> IVFPQ<T>::find_nearest_clusters(const std::vector<T>& query, uint32_t n_clusters_to_find) const {
     std::vector<std::pair<T, int>> cluster_distances;
-    cluster_distances.reserve(centroids.size());
+    cluster_distances.resize(centroids.size());
     
-    // Step 1 (Query): Score centroids - compute ||q - cj||² for all j
+    // Step 1 (Query): Score centroids - compute ||q - cj||² for all j (parallelized)
     // Using squared distance for coarse search (faster, ordering preserved)
+    #pragma omp parallel for schedule(static)
     for (size_t i = 0; i < centroids.size(); ++i) {
         T distance_squared = metrics::EuclideanDistanceSquared(query, centroids[i], vector_dim);
-        cluster_distances.emplace_back(distance_squared, static_cast<int>(i));
+        cluster_distances[i] = std::make_pair(distance_squared, static_cast<int>(i));
     }
     
     // Select top b (nprobe) clusters
