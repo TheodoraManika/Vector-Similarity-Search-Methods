@@ -250,10 +250,19 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         if (N == 1) {
             auto result = lsh.NearestNeighbour(query);
             if (result.first != -1) {
-                neighbors.push_back(result);
+                // For SIFT, skip zero distances
+                if (type != "sift" || result.second != 0.0f) {
+                    neighbors.push_back(result);
+                }
             }
         } else {
             neighbors = lsh.kNearestNeighbour(query, N);
+            // For SIFT, filter out zero distances
+            if (type == "sift") {
+                neighbors.remove_if([](const std::pair<int, float>& p) {
+                    return p.second == 0.0f;
+                });
+            }
         }
         total_approx_time += approx_timer.elapsed();
         
@@ -265,6 +274,10 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         
         for (size_t i = 0; i < dataset.size(); ++i) {
             float distance = metrics::EuclideanDistance(query, dataset[i], static_cast<int>(query.size()));
+            // For SIFT dataset, skip zero distances (self-matches)
+            if (type == "sift" && distance == 0.0f) {
+                continue;
+            }
             all_distances.emplace_back(distance, static_cast<int>(i));
         }
         
@@ -289,14 +302,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             
-            // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
-            // use the second neighbor for AF calculation
-            if (true_dist == 0.0f && true_neighbors.size() > 1) {
-                auto it = std::next(true_neighbors.begin());
-                true_dist = it->second;
-            }
-            
-            // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
+            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
             if (true_dist > 0) {
                 query_af = approx_dist / true_dist;
                 total_af += query_af;
@@ -420,6 +426,12 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
             Utils::AutoTimer approx_timer;
             approx_timer.start();
             auto neighbors = hypercube.kNearestNeighbour(queries[query_idx], N);
+            // For SIFT, filter out zero distances
+            if (type == "sift") {
+                neighbors.remove_if([](const std::pair<int, float>& p) {
+                    return p.second == 0.0f;
+                });
+            }
             total_approx_time += approx_timer.elapsed();
             
             // True nearest neighbors (brute force)
@@ -431,6 +443,10 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
             for (size_t i = 0; i < dataset.size(); ++i) {
                 // Use Manhattan distance for ground truth to match Hypercube's approximate metric
                 float dist = metrics::ManhattanDistance(queries[query_idx], dataset[i], queries[query_idx].size());
+                // For SIFT dataset, skip zero distances (self-matches)
+                if (type == "sift" && dist == 0.0f) {
+                    continue;
+                }
                 all_distances.emplace_back(dist, static_cast<int>(i));
             }
             
@@ -454,13 +470,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
                 float approx_dist = neighbors.front().second;
                 float true_dist = all_distances[0].first;
                 
-                // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
-                // use the second neighbor for AF calculation
-                if (true_dist == 0.0f && all_distances.size() > 1) {
-                    true_dist = all_distances[1].first;
-                }
-                
-                // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
+                // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
                 if (true_dist > 0) {
                     double af = static_cast<double>(approx_dist) / static_cast<double>(true_dist);
                     total_af += af;
@@ -589,10 +599,19 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
         if (N == 1) {
             auto result = ivfflat.search_nearest(query);
             if (result.first != -1) {
-                neighbors.push_back(result);
+                // For SIFT, skip zero distances
+                if (type != "sift" || result.second != 0.0f) {
+                    neighbors.push_back(result);
+                }
             }
         } else {
             neighbors = ivfflat.search_k_nearest(query, N);
+            // For SIFT, filter out zero distances
+            if (type == "sift") {
+                neighbors.remove_if([](const std::pair<int, float>& p) {
+                    return p.second == 0.0f;
+                });
+            }
         }
         total_approx_time += approx_timer.elapsed();
         
@@ -604,6 +623,10 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
         
         for (size_t i = 0; i < dataset.size(); ++i) {
             float distance = metrics::EuclideanDistance(query, dataset[i], static_cast<int>(query.size()));
+            // For SIFT dataset, skip zero distances (self-matches)
+            if (type == "sift" && distance == 0.0f) {
+                continue;
+            }
             all_distances.emplace_back(distance, static_cast<int>(i));
         }
         
@@ -634,14 +657,7 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             
-            // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
-            // use the second neighbor for AF calculation
-            if (true_dist == 0.0f && true_neighbors.size() > 1) {
-                auto it = std::next(true_neighbors.begin());
-                true_dist = it->second;
-            }
-            
-            // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
+            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
             if (true_dist > 0) {
                 double af = approx_dist / true_dist;
                 total_af += af;
@@ -790,10 +806,19 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
         if (N == 1) {
             auto result = ivfpq.search_nearest(query);
             if (result.first != -1) {
-                neighbors.push_back(result);
+                // For SIFT, skip zero distances
+                if (type != "sift" || result.second != 0.0f) {
+                    neighbors.push_back(result);
+                }
             }
         } else {
             neighbors = ivfpq.search_k_nearest(query, N);
+            // For SIFT, filter out zero distances
+            if (type == "sift") {
+                neighbors.remove_if([](const std::pair<int, float>& p) {
+                    return p.second == 0.0f;
+                });
+            }
         }
         total_approx_time += approx_timer.elapsed();
         
@@ -805,6 +830,10 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
         
         for (size_t i = 0; i < dataset.size(); ++i) {
             float distance = metrics::EuclideanDistance(query, dataset[i], static_cast<int>(query.size()));
+            // For SIFT dataset, skip zero distances (self-matches)
+            if (type == "sift" && distance == 0.0f) {
+                continue;
+            }
             all_distances.emplace_back(distance, static_cast<int>(i));
         }
         
@@ -834,14 +863,7 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
             
-            // Handle self-matches: if first true neighbor is distance 0 (query matches itself),
-            // use the second neighbor for AF calculation
-            if (true_dist == 0.0f && true_neighbors.size() > 1) {
-                auto it = std::next(true_neighbors.begin());
-                true_dist = it->second;
-            }
-            
-            // Only calculate AF if true_dist > 0 (exclude remaining 0-denominator cases)
+            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
             if (true_dist > 0) {
                 float af = approx_dist / true_dist;
                 total_af += af;

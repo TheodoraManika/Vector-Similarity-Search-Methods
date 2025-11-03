@@ -26,7 +26,7 @@ template <typename T>
 ProductQuantizer<T>::~ProductQuantizer() {}
 
 template <typename T>
-void ProductQuantizer<T>::train(const std::vector<std::vector<T>>& training_data) {
+void ProductQuantizer<T>::train(const std::vector<std::vector<double>>& training_data) {
     std::cout << "  Training Product Quantizer (" << M << " subspaces, " 
               << codebook_size << " centroids each)..." << std::endl;
     
@@ -73,7 +73,7 @@ void ProductQuantizer<T>::train(const std::vector<std::vector<T>>& training_data
 }
 
 template <typename T>
-std::vector<uint8_t> ProductQuantizer<T>::encode(const std::vector<T>& vector) const {
+std::vector<uint8_t> ProductQuantizer<T>::encode(const std::vector<double>& vector) const {
     std::vector<uint8_t> codes(M);
     
     // Parallelize encoding across subspaces
@@ -83,14 +83,18 @@ std::vector<uint8_t> ProductQuantizer<T>::encode(const std::vector<T>& vector) c
         uint8_t best_code = 0;
         
         // Extract subvector
-        std::vector<T> subvector(vector.begin() + m * subspace_dim,
+        std::vector<double> subvector(vector.begin() + m * subspace_dim,
                                vector.begin() + (m + 1) * subspace_dim);
         
         // Find nearest centroid
         for (uint32_t k = 0; k < codebook_size; ++k) {
-            T dist = metrics::EuclideanDistance(subvector, codebooks[m][k], subspace_dim);
-            if (dist < min_dist) {
-                min_dist = dist;
+            T dist_squared = 0;
+            for (uint32_t d = 0; d < subspace_dim; ++d) {
+                T diff = subvector[d] - codebooks[m][k][d];
+                dist_squared += diff * diff;
+            }
+            if (dist_squared < min_dist) {
+                min_dist = dist_squared;
                 best_code = static_cast<uint8_t>(k);
             }
         }
@@ -115,7 +119,7 @@ std::vector<T> ProductQuantizer<T>::decode(const std::vector<uint8_t>& codes) co
 }
 
 template <typename T>
-std::vector<std::vector<T>> ProductQuantizer<T>::compute_distance_table(const std::vector<T>& query) const {
+std::vector<std::vector<T>> ProductQuantizer<T>::compute_distance_table(const std::vector<double>& query) const {
     std::vector<std::vector<T>> distance_table(M);
     
     // Parallelize distance table computation across subspaces
@@ -124,7 +128,7 @@ std::vector<std::vector<T>> ProductQuantizer<T>::compute_distance_table(const st
         distance_table[m].resize(codebook_size);
         
         // Extract query subvector
-        std::vector<T> query_subvec(query.begin() + m * subspace_dim,
+        std::vector<double> query_subvec(query.begin() + m * subspace_dim,
                                   query.begin() + (m + 1) * subspace_dim);
         
         // Step 2 (Query): Build LUT[i][h] = ||ri(q) - ci,h||² (SQUARED distance)
@@ -199,7 +203,7 @@ void IVFPQ<T>::train() {
     
     // Step 3-4: Compute residuals for all vectors and prepare for PQ training
     std::cout << "  Step 3-4: Computing residuals for all vectors..." << std::flush;
-    std::vector<std::vector<T>> residuals;
+    std::vector<std::vector<double>> residuals;
     residuals.reserve(dataset.size());
     
     for (const auto& vector : dataset) {
@@ -216,9 +220,9 @@ void IVFPQ<T>::train() {
         }
         
         // Step 3: Compute residual r(x) = x - c(x)
-        std::vector<T> residual(vector_dim);
+        std::vector<double> residual(vector_dim);
         for (uint32_t d = 0; d < vector_dim; ++d) {
-            residual[d] = vector[d] - centroids[nearest_cluster][d];
+            residual[d] = static_cast<double>(vector[d]) - centroids[nearest_cluster][d];
         }
         
         residuals.push_back(residual);
@@ -248,9 +252,9 @@ void IVFPQ<T>::add_vectors(const std::vector<std::vector<T>>& vectors) {
         }
         
         // Step 3: Compute residual r(x) = x - c(x)
-        std::vector<T> residual(vector_dim);
+        std::vector<double> residual(vector_dim);
         for (uint32_t d = 0; d < vector_dim; ++d) {
-            residual[d] = vectors[i][d] - centroids[cluster_id][d];
+            residual[d] = static_cast<double>(vectors[i][d]) - centroids[cluster_id][d];
         }
         
         // Step 6-7: Encode residual with product quantizer
@@ -285,9 +289,9 @@ std::list<std::pair<int, T>> IVFPQ<T>::search_k_nearest(const std::vector<T>& qu
         
         // Step 2 (Query): For each selected cluster cj
         // Compute residual r(q) = q - cj
-        std::vector<T> query_residual(vector_dim);
+        std::vector<double> query_residual(vector_dim);
         for (uint32_t d = 0; d < vector_dim; ++d) {
-            query_residual[d] = query[d] - centroids[cluster_id][d];
+            query_residual[d] = static_cast<double>(query[d]) - centroids[cluster_id][d];
         }
         
         // Split r(q) = [r1(q), ..., rM(q)]
@@ -334,9 +338,9 @@ std::list<std::pair<int, T>> IVFPQ<T>::range_search(const std::vector<T>& query,
         const auto& inverted_list = inverted_lists[cluster_id];
         
         // Step 2 (Query): Compute residual r(q) = q - cj and build LUT
-        std::vector<T> query_residual(vector_dim);
+        std::vector<double> query_residual(vector_dim);
         for (uint32_t d = 0; d < vector_dim; ++d) {
-            query_residual[d] = query[d] - centroids[cluster_id][d];
+            query_residual[d] = static_cast<double>(query[d]) - centroids[cluster_id][d];
         }
         
         // Build LUT[i][h] = ||ri(q) - ci,h||²
@@ -387,18 +391,19 @@ std::vector<int> IVFPQ<T>::find_nearest_clusters(const std::vector<T>& query, ui
 }
 
 template <typename T>
-T IVFPQ<T>::compute_pq_distance([[maybe_unused]] const std::vector<T>& query, const std::vector<uint8_t>& codes,
+T IVFPQ<T>::compute_pq_distance([[maybe_unused]] const std::vector<double>& query, const std::vector<uint8_t>& codes,
                                 const std::vector<std::vector<T>>& distance_table) const {
     // Step 3 (Query): Asymmetric Distance Computation (ADC)
     // d(q, x) = Σ(i=1 to M) LUT[i][codei(x)]
     // Since LUT contains squared distances, this computes the sum of squared subspace distances
-    T total_distance = 0;
+    T total_distance_squared = 0;
     
     for (uint32_t m = 0; m < M; ++m) {
-        total_distance += distance_table[m][codes[m]];
+        total_distance_squared += distance_table[m][codes[m]];
     }
     
-    return total_distance;
+    // Return Euclidean distance (square root of sum of squared distances)
+    return std::sqrt(total_distance_squared);
 }
 
 // Explicit template instantiation

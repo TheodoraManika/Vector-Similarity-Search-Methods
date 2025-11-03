@@ -21,10 +21,10 @@ public:
     ProductQuantizer(uint32_t M, uint32_t codebook_size, uint32_t vector_dim);
     ~ProductQuantizer();
     
-    void train(const std::vector<std::vector<T>>& training_data);
-    std::vector<uint8_t> encode(const std::vector<T>& vector) const;
+    void train(const std::vector<std::vector<double>>& training_data);
+    std::vector<uint8_t> encode(const std::vector<double>& vector) const;
     std::vector<T> decode(const std::vector<uint8_t>& codes) const;
-    std::vector<std::vector<T>> compute_distance_table(const std::vector<T>& query) const;
+    std::vector<std::vector<T>> compute_distance_table(const std::vector<double>& query) const;
     
     uint32_t get_M() const { return M; }
     uint32_t get_codebook_size() const { return codebook_size; }
@@ -71,6 +71,6 @@ public:
 private:
     // Helper functions
     std::vector<int> find_nearest_clusters(const std::vector<T>& query, uint32_t n_clusters_to_find) const;
-    T compute_pq_distance(const std::vector<T>& query, const std::vector<uint8_t>& codes,
+    T compute_pq_distance(const std::vector<double>& query, const std::vector<uint8_t>& codes,
                          const std::vector<std::vector<T>>& distance_table) const;
 };
