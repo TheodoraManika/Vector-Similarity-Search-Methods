@@ -7,7 +7,6 @@
 #include "../../algorithms/hypercube/Hypercube.h"
 #include "../../algorithms/IVFFlat/IVFFlat.h"
 #include "../../algorithms/IVFPQ/IVFPQ.h"
-#include "../../algorithms/BruteForce/BruteForce.h"
 #include "../../metrics/metrics.h"
 #include <iostream>
 #include <fstream>
@@ -237,6 +236,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     double total_af = 0.0;
     double total_recall = 0.0;
     int valid_queries = 0;
+    int valid_af_queries = 0;  // Separate counter for AF (excludes true_dist == 0)
     
     const size_t queries_to_process = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
     for (size_t query_idx = 0; query_idx < queries_to_process; ++query_idx) {
@@ -284,10 +284,16 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
         double query_recall = 0.0;
         
         if (!neighbors.empty() && !true_neighbors.empty()) {
+            valid_queries++;
+            
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
+            
+            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
             if (true_dist > 0) {
                 query_af = approx_dist / true_dist;
+                total_af += query_af;
+                valid_af_queries++;
             }
             
             // Calculate Recall@N for this query
@@ -304,12 +310,8 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
                 }
             }
             query_recall = static_cast<double>(matches) / N;
-            
-            valid_queries++;
+            total_recall += query_recall;
         }
-        
-        total_af += query_af;
-        total_recall += query_recall;
         
         // Range search if requested
         std::list<int> range_result_ids;
@@ -327,7 +329,7 @@ int Interface::executeLSH(const std::string& input_file, const std::string& quer
     double total_time_seconds = total_timer.elapsed();
     
     // Calculate average metrics
-    double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
+    double avg_af = valid_af_queries > 0 ? total_af / valid_af_queries : 0.0;
     double recall_at_n = valid_queries > 0 ? total_recall / valid_queries : 0.0;
     double avg_approx_time = queries_to_process > 0 ? total_approx_time / queries_to_process : 0.0;
     double avg_true_time = queries_to_process > 0 ? total_true_time / queries_to_process : 0.0;
@@ -399,6 +401,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     double total_true_time = 0.0;
     
     int successful_queries = 0;
+    int valid_af_queries = 0;  // Separate counter for AF (excludes true_dist == 0)
     double total_af = 0.0;
     double total_recall = 0.0;
     
@@ -439,10 +442,17 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
             
             // Calculate approximation factor and recall for this query
             if (!neighbors.empty() && !all_distances.empty()) {
+                successful_queries++;
+                
                 float approx_dist = neighbors.front().second;
                 float true_dist = all_distances[0].first;
-                double af = static_cast<double>(approx_dist) / static_cast<double>(true_dist);
-                total_af += af;
+                
+                // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
+                if (true_dist > 0) {
+                    double af = static_cast<double>(approx_dist) / static_cast<double>(true_dist);
+                    total_af += af;
+                    valid_af_queries++;
+                }
                 
                 // Calculate recall: |approx ∩ true| / N
                 int matches = 0;
@@ -453,8 +463,6 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
                 }
                 double recall = static_cast<double>(matches) / static_cast<double>(N);
                 total_recall += recall;
-                
-                successful_queries++;
             }
             
             // Range search if requested
@@ -478,7 +486,7 @@ int Interface::executeHypercube(const std::string& input_file, const std::string
     double total_time_seconds = total_timer.elapsed();
     
     // Calculate statistics and output final results according to PDF specification
-    double avg_af = successful_queries > 0 ? total_af / successful_queries : 0.0;
+    double avg_af = valid_af_queries > 0 ? total_af / valid_af_queries : 0.0;
     double avg_recall = successful_queries > 0 ? total_recall / successful_queries : 0.0;
     double avg_approx_time = total_approx_time / max_queries;
     double avg_true_time = total_true_time / max_queries;
@@ -553,6 +561,7 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
     double total_af = 0.0;
     double total_recall = 0.0;
     int valid_queries = 0;
+    int valid_af_queries = 0;  // Separate counter for AF (excludes true_dist == 0)
     const size_t queries_to_process = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
     
     // Process queries
@@ -574,11 +583,25 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
         }
         total_approx_time += approx_timer.elapsed();
         
-        // True (brute force) search
+        // True (brute force) search using inline Euclidean distance
         Utils::AutoTimer true_timer;
         true_timer.start();
-        BruteForce<float> brute_force(dataset.size(), dataset[0].size(), dataset);
-        std::list<std::pair<int, float>> true_neighbors = brute_force.kNearestNeighbors(query, N);
+        std::vector<std::pair<float, int>> all_distances;
+        all_distances.reserve(dataset.size());
+        
+        for (size_t i = 0; i < dataset.size(); ++i) {
+            float distance = metrics::EuclideanDistance(query, dataset[i], static_cast<int>(query.size()));
+            all_distances.emplace_back(distance, static_cast<int>(i));
+        }
+        
+        std::partial_sort(all_distances.begin(), 
+                         all_distances.begin() + std::min(N, static_cast<int>(all_distances.size())),
+                         all_distances.end());
+        
+        std::list<std::pair<int, float>> true_neighbors;
+        for (int i = 0; i < N && i < static_cast<int>(all_distances.size()); ++i) {
+            true_neighbors.emplace_back(all_distances[i].second, all_distances[i].first);
+        }
         total_true_time += true_timer.elapsed();
         
         // Range search if enabled
@@ -597,9 +620,12 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
             // Approximation Factor (AF)
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
+            
+            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
             if (true_dist > 0) {
                 double af = approx_dist / true_dist;
                 total_af += af;
+                valid_af_queries++;
             }
             
             // Recall
@@ -644,7 +670,7 @@ int Interface::executeIVFFlat(const std::string& input_file, const std::string& 
     double total_time_seconds = total_timer.elapsed();
     
     // Calculate and print final statistics
-    double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
+    double avg_af = valid_af_queries > 0 ? total_af / valid_af_queries : 0.0;
     double avg_recall = valid_queries > 0 ? total_recall / valid_queries : 0.0;
     double avg_approx_time = queries_to_process > 0 ? total_approx_time / queries_to_process : 0.0;
     double avg_true_time = queries_to_process > 0 ? total_true_time / queries_to_process : 0.0;
@@ -729,6 +755,7 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
     double total_af = 0.0;
     double total_recall = 0.0;
     int valid_queries = 0;
+    int valid_af_queries = 0;  // Separate counter for AF (excludes true_dist == 0)
     const size_t queries_to_process = qmax > 0 ? std::min(queries.size(), static_cast<size_t>(qmax)) : queries.size();
     
     // Process queries
@@ -750,11 +777,25 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
         }
         total_approx_time += approx_timer.elapsed();
         
-        // True (brute force) search
+        // True (brute force) search using inline Euclidean distance
         Utils::AutoTimer true_timer;
         true_timer.start();
-        BruteForce<float> brute_force(dataset.size(), dataset[0].size(), dataset);
-        std::list<std::pair<int, float>> true_neighbors = brute_force.kNearestNeighbors(query, N);
+        std::vector<std::pair<float, int>> all_distances;
+        all_distances.reserve(dataset.size());
+        
+        for (size_t i = 0; i < dataset.size(); ++i) {
+            float distance = metrics::EuclideanDistance(query, dataset[i], static_cast<int>(query.size()));
+            all_distances.emplace_back(distance, static_cast<int>(i));
+        }
+        
+        std::partial_sort(all_distances.begin(), 
+                         all_distances.begin() + std::min(N, static_cast<int>(all_distances.size())),
+                         all_distances.end());
+        
+        std::list<std::pair<int, float>> true_neighbors;
+        for (int i = 0; i < N && i < static_cast<int>(all_distances.size()); ++i) {
+            true_neighbors.emplace_back(all_distances[i].second, all_distances[i].first);
+        }
         total_true_time += true_timer.elapsed();
         
         // Range search (R-near neighbors)
@@ -772,9 +813,12 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
             
             float approx_dist = neighbors.front().second;
             float true_dist = true_neighbors.front().second;
+            
+            // Only calculate AF if true_dist > 0 (exclude 0-denominator cases)
             if (true_dist > 0) {
                 float af = approx_dist / true_dist;
                 total_af += af;
+                valid_af_queries++;
             }
             
             // Calculate recall
@@ -812,7 +856,7 @@ int Interface::executeIVFPQ(const std::string& input_file, const std::string& qu
     double total_time_seconds = total_timer.elapsed();
     
     // Calculate average metrics
-    double avg_af = valid_queries > 0 ? total_af / valid_queries : 0.0;
+    double avg_af = valid_af_queries > 0 ? total_af / valid_af_queries : 0.0;
     double recall_at_n = valid_queries > 0 ? total_recall / valid_queries : 0.0;
     double qps = (total_time_seconds > 0) ? (static_cast<double>(queries_to_process) / total_time_seconds) : 0.0;
     double avg_approx_time = queries_to_process > 0 ? total_approx_time / queries_to_process : 0.0;
