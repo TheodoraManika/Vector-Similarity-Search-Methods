@@ -5,5 +5,4 @@ dataset/*.fvecs
 search
 
 # Ignore large result files
-results/*.txt
-results/*
+results/report_tests/*

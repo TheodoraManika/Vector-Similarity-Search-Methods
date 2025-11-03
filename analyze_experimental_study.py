@@ -57,15 +57,43 @@ def format_float(val, decimals=5):
 # For simplicity and to avoid duplication, we inline the same logic here.
 # If you prefer, you can refactor to import shared functions.
 
-from analyze_report_tests import (
-    generate_lsh_mnist_tables,
-    generate_lsh_sift_tables,
-    generate_hypercube_mnist_tables,
-    generate_hypercube_sift_tables,
-    generate_ivfflat_mnist_tables,
-    generate_ivfflat_sift_tables,
-    generate_ivfpq_mnist_tables,
-)
+def generate_algo_markdown(algo: str, base_dir: Path) -> str:
+    """Generate a simple markdown table for a given algorithm by scanning result files.
+    Columns: config (filename stem), Average AF, Recall@N, QPS, tApproximateAverage, tTrueAverage
+    """
+    algo_dir = base_dir / algo
+    if not algo_dir.exists():
+        return f"### {algo.upper()}\n\n_No results found for {algo}._\n\n"
+
+    rows = []
+    for result_file in sorted(algo_dir.glob('*.txt')):
+        data = parse_result_file(result_file)
+        if not data:
+            continue
+        rows.append({
+            'config': result_file.stem,
+            'af': data['af'],
+            'recall': data['recall'],
+            'qps': data['qps'],
+            'approx_time': data['approx_time'],
+            'true_time': data['true_time'],
+        })
+
+    # Build markdown
+    md = [f"### {algo.upper()}\n",
+          "| Config | Average AF | Recall@N | QPS | tApproximateAverage | tTrueAverage |",
+          "|---|---:|---:|---:|---:|---:|"]
+    for r in rows:
+        md.append(
+            f"| {r['config']} | {format_float(r['af'], 6)} | {format_float(r['recall'], 6)} | "
+            f"{format_float(r['qps'], 2)} | {format_float(r['approx_time'], 6)} | {format_float(r['true_time'], 6)} |"
+        )
+
+    if not rows:
+        md.append("_No parsed results._")
+
+    md.append("")
+    return "\n".join(md)
 
 
 def main():
@@ -76,30 +104,16 @@ def main():
     
     print("Parsing test results and generating report...")
     
-    # Generate markdown report
+    # Generate markdown report by scanning result files (no external report module)
     md_content = "# Report Test Results Summary\n\n"
     md_content += f"Generated from: `{RESULTS_DIR}`\n\n"
-    
-    md_content += "## LSH\n"
-    md_content += generate_lsh_mnist_tables(RESULTS_DIR)
+    md_content += generate_algo_markdown('lsh', RESULTS_DIR)
     md_content += "\n"
-    md_content += generate_lsh_sift_tables(RESULTS_DIR)
-    md_content += "\n\n"
-    
-    md_content += "## HYPERCUBE\n"
-    md_content += generate_hypercube_mnist_tables(RESULTS_DIR)
+    md_content += generate_algo_markdown('hypercube', RESULTS_DIR)
     md_content += "\n"
-    md_content += generate_hypercube_sift_tables(RESULTS_DIR)
-    md_content += "\n\n"
-    
-    md_content += "## IVFFlat\n"
-    md_content += generate_ivfflat_mnist_tables(RESULTS_DIR)
+    md_content += generate_algo_markdown('ivfflat', RESULTS_DIR)
     md_content += "\n"
-    md_content += generate_ivfflat_sift_tables(RESULTS_DIR)
-    md_content += "\n\n"
-    
-    md_content += "## IVFPQ\n"
-    md_content += generate_ivfpq_mnist_tables(RESULTS_DIR)
+    md_content += generate_algo_markdown('ivfpq', RESULTS_DIR)
     md_content += "\n"
     
     # Write markdown

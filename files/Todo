@@ -22,6 +22,7 @@ To do Theodora:
 - [✓] make sure i have the correct input values for hypercube from the command line 
 - [✓] save brute force results so i wont compute them again and again
 - [✓] compute parallel for better time management
+- [✓] create expiramental study
 - [✓] check ivpq implementation until correct
 - [✓] recall implementation is wrong (lets hope i fixed it)
 - [✓] add range parameter 300 for sift and 200 for mnist to report tests and remove 1 neighbor tests
