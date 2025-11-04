@@ -355,19 +355,6 @@ std::pair<int, T> LSH<T>::NearestNeighbour(const std::vector<T>& query_vector) {
         }
     }
     
-    // If no candidates found, perform brute force search on a subset
-    if (best_idx == -1 && !feature_vectors.empty()) {
-        // Search through first few vectors as fallback
-        int search_limit = std::min(static_cast<int>(feature_vectors.size()), 100);
-        for (int i = 0; i < search_limit; ++i) {
-            T distance = metrics::EuclideanDistance(query_vector, feature_vectors[i], static_cast<int>(query_vector.size()));
-            if (distance < best_distance) {
-                best_distance = distance;
-                best_idx = i;
-            }
-        }
-    }
-    
     return std::make_pair(best_idx, best_distance);
 }
 
@@ -383,97 +370,64 @@ std::list<std::pair<int, T>> LSH<T>::kNearestNeighbour(const std::vector<T>& que
         throw std::invalid_argument("k must be positive");
     }
     
-    // Use priority queue to keep track of k best candidates
-    std::priority_queue<std::pair<T, int>> pq; // max heap by distance (k-th farthest at top)
+    std::list<std::pair<int, T>> result;
+    T kth_min = std::numeric_limits<T>::max();
     std::unordered_set<int> checked_indices;
-    size_t items_retrieved = 0;
-    const size_t early_termination_threshold = 10 * L; // Optional early termination
     
+    auto scan_bucket = [&](const std::vector<std::pair<int, uint64_t>>& candidates) {
+        for (const auto& candidate : candidates) {
+            int pid = candidate.first;
+            
+            // Skip if already checked (avoid duplicate distance computations)
+            if (checked_indices.count(pid)) {
+                continue;
+            }
+            checked_indices.insert(pid);
+            
+            // Validate candidate index
+            if (pid < 0 || pid >= static_cast<int>(feature_vectors.size())) {
+                continue; // Skip invalid indices
+            }
+            
+            T dist = metrics::EuclideanDistance(query_vector, feature_vectors[pid], static_cast<int>(query_vector.size()));
+            std::pair<int, T> p{pid, dist};
+            
+            if (result.empty()) {
+                result.push_back(p);
+                kth_min = dist;
+                continue;
+            }
+            
+            // skip duplicates
+            if (std::find(result.begin(), result.end(), p) != result.end()) continue;
+            
+            if (result.size() < static_cast<size_t>(k)) {
+                // insert sorted
+                auto it = result.begin();
+                while (it != result.end() && it->second <= dist) ++it;
+                result.insert(it, p);
+                kth_min = result.back().second;
+            } else if (dist < kth_min) {
+                auto it = result.begin();
+                while (it != result.end() && it->second <= dist) ++it;
+                result.insert(it, p);
+                result.pop_back();
+                kth_min = result.back().second;
+            }
+        }
+    };
+    
+    // Scan all L hash tables
     auto amp_it = amplified_hash_fns.begin();
     for (uint32_t table_idx = 0; table_idx < L; ++table_idx, ++amp_it) {
-        // Compute hash value and ID for query gi(q)
+        // Compute hash value for query
         uint32_t hash_val = our_math::computeAmplifiedHash(query_vector, *amp_it, w, M);
-        // Note: Candidate ID equality filter is disabled to avoid over-filtering.
         
-        // Get candidates from bucket gi(q)
+        // Get candidates from exact bucket only
         auto bucket_it = lsh_tables[table_idx].find(hash_val);
         if (bucket_it != lsh_tables[table_idx].end()) {
-            const std::vector<std::pair<int, uint64_t>>& candidates = bucket_it->second;
-        
-            for (const auto& candidate : candidates) {
-                int candidate_idx = candidate.first;
-                
-                // Skip if already checked (avoid duplicate distance computations)
-                if (checked_indices.count(candidate_idx)) {
-                    continue;
-                }
-                checked_indices.insert(candidate_idx);
-                items_retrieved++;
-                
-                // Validate candidate index
-                if (candidate_idx < 0 || candidate_idx >= static_cast<int>(feature_vectors.size())) {
-                    continue; // Skip invalid indices
-                }
-                
-                // Compute actual distance dist(q, p)
-                T distance = metrics::EuclideanDistance(query_vector, feature_vectors[candidate_idx], static_cast<int>(query_vector.size()));
-                
-                // Update k best candidates: maintain sorted k best distances
-                if (pq.size() < static_cast<size_t>(k)) {
-                    pq.push(std::make_pair(distance, candidate_idx));
-                } else if (distance < pq.top().first) {
-                    // Replace k-th farthest candidate with better one
-                    pq.pop();
-                    pq.push(std::make_pair(distance, candidate_idx));
-                }
-                
-                // Optional early termination: if large number of items retrieved
-                if (items_retrieved > early_termination_threshold && pq.size() >= static_cast<size_t>(k)) {
-                    // Convert priority queue to sorted list and return
-                    std::list<std::pair<int, T>> result;
-                    while (!pq.empty()) {
-                        auto& top = pq.top();
-                        result.push_front(std::make_pair(top.second, top.first));
-                        pq.pop();
-                    }
-                    return result;
-                }
-            }
+            scan_bucket(bucket_it->second);
         }
-    }
-    
-    // If we don't have enough candidates, perform limited brute force search
-    if (pq.size() < static_cast<size_t>(k) && !feature_vectors.empty()) {
-        // Calculate how many more we need
-        int needed = k - static_cast<int>(pq.size());
-        T worst_distance = pq.empty() ? std::numeric_limits<T>::max() : pq.top().first;
-        
-        // Search through vectors not yet checked (limit to reasonable amount)
-        size_t search_limit = std::min(feature_vectors.size(), checked_indices.size() + 1000);
-        for (size_t i = 0; i < search_limit && needed > 0; ++i) {
-            if (checked_indices.count(static_cast<int>(i))) {
-                continue; // Skip already checked
-            }
-            
-            T distance = metrics::EuclideanDistance(query_vector, feature_vectors[i], static_cast<int>(query_vector.size()));
-            
-            if (pq.size() < static_cast<size_t>(k)) {
-                pq.push(std::make_pair(distance, static_cast<int>(i)));
-                needed--;
-            } else if (distance < worst_distance) {
-                pq.pop();
-                pq.push(std::make_pair(distance, static_cast<int>(i)));
-                worst_distance = pq.top().first;
-            }
-        }
-    }
-    
-    // Convert priority queue to sorted list
-    std::list<std::pair<int, T>> result;
-    while (!pq.empty()) {
-        auto& top = pq.top();
-        result.push_front(std::make_pair(top.second, top.first));
-        pq.pop();
     }
     
     return result;
@@ -491,58 +445,45 @@ std::list<std::pair<int, T>> LSH<T>::RangeSearch(const std::vector<T>& query_vec
         throw std::invalid_argument("Invalid radius or c parameter");
     }
     
-    std::list<std::pair<int, T>> result;
+    std::list<std::pair<int, T>> out;
     std::unordered_set<int> checked_indices;
-    T range_threshold = static_cast<T>(radius * c);
     
+    auto collect_bucket = [&](const std::vector<std::pair<int, uint64_t>>& candidates) {
+        for (const auto& candidate : candidates) {
+            int pid = candidate.first;
+            
+            // Skip if already checked (avoid duplicate distance computations)
+            if (checked_indices.count(pid)) {
+                continue;
+            }
+            checked_indices.insert(pid);
+            
+            // Validate candidate index
+            if (pid < 0 || pid >= static_cast<int>(feature_vectors.size())) {
+                continue; // Skip invalid indices
+            }
+            
+            T dist = metrics::EuclideanDistance(query_vector, feature_vectors[pid], static_cast<int>(query_vector.size()));
+            if (dist < static_cast<T>(radius * c)) {
+                out.emplace_back(pid, dist);
+            }
+        }
+    };
+    
+    // Scan all L hash tables
     auto amp_it = amplified_hash_fns.begin();
     for (uint32_t table_idx = 0; table_idx < L; ++table_idx, ++amp_it) {
-        // Compute hash value and ID for query
+        // Compute hash value for query
         uint32_t hash_val = our_math::computeAmplifiedHash(query_vector, *amp_it, w, M);
-        uint64_t query_id = our_math::computeID(query_vector, *amp_it, w);
         
-        // Get candidates from this bucket
+        // Get candidates from exact bucket only
         auto bucket_it = lsh_tables[table_idx].find(hash_val);
         if (bucket_it != lsh_tables[table_idx].end()) {
-            const std::vector<std::pair<int, uint64_t>>& candidates = bucket_it->second;
-        
-            for (const auto& candidate : candidates) {
-                int candidate_idx = candidate.first;
-                uint64_t candidate_id = candidate.second;
-                
-                // Skip if already checked (O(1) average case with unordered_set)
-                if (checked_indices.count(candidate_idx)) {
-                    continue;
-                }
-                checked_indices.insert(candidate_idx);
-                
-                // Validate candidate index
-                if (candidate_idx < 0 || candidate_idx >= static_cast<int>(feature_vectors.size())) {
-                    continue; // Skip invalid indices
-                }
-                
-                // For RangeSearch, we check all candidates in the bucket
-                // (ID filtering is too restrictive for range queries)
-                // However, we still use candidate_id for completeness (it's computed during preprocessing)
-                (void)candidate_id; // Mark as intentionally unused
-                (void)query_id;     // Mark as intentionally unused
-                
-                // Compute actual distance
-                T distance = metrics::EuclideanDistance(query_vector, feature_vectors[candidate_idx], static_cast<int>(query_vector.size()));
-                
-                if (distance <= range_threshold) {
-                    result.push_back(std::make_pair(candidate_idx, distance));
-                }
-            }
+            collect_bucket(bucket_it->second);
         }
     }
     
-    // Sort by distance
-    result.sort([](const std::pair<int, T>& a, const std::pair<int, T>& b) {
-        return a.second < b.second;
-    });
-    
-    return result;
+    return out;
 }
 
 template <typename T>

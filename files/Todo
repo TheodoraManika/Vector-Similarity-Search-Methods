@@ -51,8 +51,9 @@ To do Myrto:
 - [✓] check input and output for ivfflat and ivfpq because they do not generate output files
 - [✓] do the same that you did for kmeans for ivfflat 
 - [✓] theory check for ivfpq
-- [ ] create duplicate run_report_test based on report results (recall 0.9)
+- [✓] create duplicate run_report_test based on report results (recall 0.9)
 - [ ] κάτι πάει λάθος με lsh 
 - [✓] oral 4:30 to 5:00 pm thursday 6/11
 - [ ] !!!when we are done, we need to change the maybe unused clauses for the manually given parameters
 - [ ] add better comments where needed
+- [ ] fix mnist (remove brute force from mnist)
