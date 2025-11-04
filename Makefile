@@ -150,24 +150,24 @@ test-ivfpq-mnist: $(TARGET)
 # Experimental Study Targets
 analyze-study:
 	@echo "Analyzing Experimental Study Results..."
-	@python3 analyze_experimental_study.py
+	@python3 experimental_study/analyze_experimental_study.py
 	@echo ""
-	@echo "Report generated: results/EXPERIMENTAL_STUDY_REPORT.md"
+	@echo "Report generated: results/REPORT_TESTS_SUMMARY.md"
 
 experimental-study: $(TARGET)
 	@echo "Running full experimental study..."
-	@chmod +x run_expiramental_study.sh
-	@./run_expiramental_study.sh
+	@chmod +x experimental_study/run_experimental_study.sh
+	@./experimental_study/run_experimental_study.sh
 
 experimental-study2: $(TARGET)
 	@echo "Running full experimental study2..."
-	@chmod +x run_expiramental_study2.sh
-	@./run_expiramental_study2.sh
+	@chmod +x experimental_study/run_experimental_study2.sh
+	@./experimental_study/run_experimental_study2.sh
 
 experimental-study3: $(TARGET)
 	@echo "Running full experimental study3..."
-	@chmod +x run_expiramental_study3.sh
-	@./run_expiramental_study3.sh
+	@chmod +x experimental_study/run_experimental_study3.sh
+	@./experimental_study/run_experimental_study3.sh
 
 # Help target
 help:
@@ -190,12 +190,12 @@ help:
 
 # Phony targets
 .PHONY: all all-tests debug clean rebuild install docs help
-.PHONY: experimental-study analyze-study report-tests
+.PHONY: experimental-study experimental-study2 experimental-study3 analyze-study
 .PHONY: test-lsh test-lsh-sift test-lsh-mnist test-hypercube test-hypercube-sift test-hypercube-mnist
 .PHONY: test-ivfflat test-ivfflat-sift test-ivfflat-mnist test-ivfpq test-ivfpq-sift test-ivfpq-mnist
 
 # Dependencies (basic)
-$(OBJ_DIR)/main.o: main.cpp $(UTILS_DIR)/interface/Interface.h
+$(OBJ_DIR)/src/main.o: src/main.cpp $(UTILS_DIR)/interface/Interface.h
 $(OBJ_DIR)/$(INTERFACE_SRC:%.cpp=%.o): $(INTERFACE_SRC) $(UTILS_DIR)/interface/Interface.h
 $(OBJ_DIR)/$(LSH_SRC:%.cpp=%.o): $(LSH_SRC) $(ALGORITHM_DIR)/LSH/LSH.h
 $(OBJ_DIR)/$(HYPERCUBE_SRC:%.cpp=%.o): $(HYPERCUBE_SRC) $(ALGORITHM_DIR)/hypercube/Hypercube.h
