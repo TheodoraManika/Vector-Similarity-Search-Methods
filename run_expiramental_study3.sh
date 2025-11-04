@@ -69,30 +69,26 @@ echo "Set QMAX or MAX_JOBS env vars to change (e.g., MAX_JOBS=4 ./run_expirament
 # Selecting best speed/recall combinations
 ########################################
 if [[ -f "$MNIST_TRAIN" && -f "$MNIST_QUERY" ]]; then
-  echo "=== LSH MNIST (OPTIMIZED - 100% Recall) ==="
+  echo "=== LSH MNIST (OPTIMIZED - ~93% Recall) ==="
   
-  # BEST OVERALL: High speed + 100% recall
-  echo "  [BEST] Fastest with perfect recall..."
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k2_w5000_N5_BEST.txt" -type mnist -lsh -k 2 -L 100 -w 5000 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k3_w4500_N5.txt" -type mnist -lsh -k 3 -L 100 -w 4500 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
+  # BEST OVERALL: w=1000 achieves 92.8% recall with AF=1.001702, QPS=5.39
+  echo "  [BEST] Optimal parameters: w=1000, L=100, k=2..."
+  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k2_w1000_N10_BEST.txt" -type mnist -lsh -k 2 -L 100 -w 1000 -N 10 -R 1000 -range true -qmax $QMAX -auto_w false
   
-  # Speed/Quality tradeoffs
-  echo "  [TRADEOFF] Different speed/quality tradeoffs..."
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L80_k2_w4500_N5.txt" -type mnist -lsh -k 2 -L 80 -w 4500 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k2_w4500_N5.txt" -type mnist -lsh -k 2 -L 100 -w 4500 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k3_w4000_N5.txt" -type mnist -lsh -k 3 -L 100 -w 4000 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L120_k3_w4000_N5.txt" -type mnist -lsh -k 3 -L 120 -w 4000 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
+  # Alternative configurations for comparison
+  echo "  [ALTERNATIVES] Testing variations around optimal..."
+  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L80_k2_w1000_N10.txt" -type mnist -lsh -k 2 -L 80 -w 1000 -N 10 -R 1000 -range true -qmax $QMAX -auto_w false
+  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k2_w950_N10.txt" -type mnist -lsh -k 2 -L 100 -w 950 -N 10 -R 1000 -range true -qmax $QMAX -auto_w false
+  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k3_w1000_N10.txt" -type mnist -lsh -k 3 -L 100 -w 1000 -N 10 -R 1000 -range true -qmax $QMAX -auto_w false
   
-  # Higher quality (L=150) for maximum robustness
-  echo "  [HIGH QUALITY] Maximum L for most robust results..."
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L150_k2_w4500_N5.txt" -type mnist -lsh -k 2 -L 150 -w 4500 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L150_k3_w4000_N5.txt" -type mnist -lsh -k 3 -L 150 -w 4000 -N 5 -R 500 -range true -qmax $QMAX -auto_w false
+  # Higher L for maximum quality
+  echo "  [HIGH QUALITY] Increased hash tables for better recall..."
+  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L150_k2_w1000_N10.txt" -type mnist -lsh -k 2 -L 150 -w 1000 -N 10 -R 1000 -range true -qmax $QMAX -auto_w false
   
-  # N=10 tests for best configurations
-  echo "  [N=10] Testing with more neighbors returned..."
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k2_w4500_N10.txt" -type mnist -lsh -k 2 -L 100 -w 4500 -N 10 -R 500 -range true -qmax $QMAX -auto_w false
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L120_k3_w4000_N10.txt" -type mnist -lsh -k 3 -L 120 -w 4000 -N 10 -R 500 -range true -qmax $QMAX -auto_w false
-  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L150_k2_w4500_N10.txt" -type mnist -lsh -k 2 -L 150 -w 4500 -N 10 -R 500 -range true -qmax $QMAX -auto_w false
+  # Lower recall configurations (faster)
+  echo "  [FASTER] Lower w for higher speed, lower recall..."
+  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k2_w800_N10.txt" -type mnist -lsh -k 2 -L 100 -w 800 -N 10 -R 1000 -range true -qmax $QMAX -auto_w false
+  run_parallel ./search -d "$MNIST_TRAIN" -q "$MNIST_QUERY" -o "${RESULTS_DIR}/lsh/mnist_L100_k2_w900_N10.txt" -type mnist -lsh -k 2 -L 100 -w 900 -N 10 -R 1000 -range true -qmax $QMAX -auto_w false
 else
   echo "[WARN] MNIST files not found: $MNIST_TRAIN / $MNIST_QUERY — skipping LSH MNIST"
 fi
